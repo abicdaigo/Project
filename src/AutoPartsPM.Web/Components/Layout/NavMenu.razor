@@ -1,0 +1,64 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+<MudNavMenu>
+    <MudText Typo="Typo.h6" Class="px-4 py-3" Color="Color.Primary">メニュー</MudText>
+
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+        ダッシュボード
+    </MudNavLink>
+
+    <MudNavLink Href="/projects" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Folder">
+        プロジェクト管理
+    </MudNavLink>
+
+    <MudNavLink Href="/customers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">
+        顧客管理
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">プロジェクト機能</MudText>
+
+    <MudNavLink Href="/schedules" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CalendarMonth">
+        スケジュール
+    </MudNavLink>
+
+    <MudNavLink Href="/gate-reviews" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.CheckCircle">
+        ゲートレビュー
+    </MudNavLink>
+
+    <MudNavLink Href="/ppap" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Description">
+        PPAP管理
+    </MudNavLink>
+
+    <MudNavLink Href="/documents" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AttachFile">
+        文書管理
+    </MudNavLink>
+
+    <MudNavLink Href="/issues" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.BugReport">
+        課題管理
+    </MudNavLink>
+
+    <MudNavLink Href="/equipment" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Precision Manufacturing">
+        設備管理
+    </MudNavLink>
+
+    <AuthorizeView Roles="PM_Admins">
+        <Authorized>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">管理</MudText>
+
+            <MudNavLink Href="/admin/users" Match="NavLinkMatch.Prefix"
+                Icon="@Icons.Material.Filled.AdminPanelSettings">
+                ユーザー管理
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/templates" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.ContentCopy">
+                テンプレート管理
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
+                システム設定
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

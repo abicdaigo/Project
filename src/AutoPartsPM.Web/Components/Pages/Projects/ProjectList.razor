@@ -1,0 +1,154 @@
+@page "/projects"
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+
+<PageTitle>プロジェクト一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">プロジェクト一覧</MudText>
+
+<!-- 検索・フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField @bind-Value="_searchTerm" Placeholder="検索（コード・名称・品番・顧客）"
+                Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="Search" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="ProjectStatus?" @bind-Value="_statusFilter" Label="ステータス" Clearable="true"
+                AnchorOrigin="Origin.BottomCenter">
+                @foreach (ProjectStatus status in Enum.GetValues<ProjectStatus>())
+                {
+                    <MudSelectItem Value="@((ProjectStatus?)status)">@GetStatusName(status)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search"
+                StartIcon="@Icons.Material.Filled.Search" Class="mt-1">
+                検索
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNew"
+                StartIcon="@Icons.Material.Filled.Add" FullWidth="true" Class="mt-1">
+                新規作成
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@_projects" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading"
+        OnRowClick="@(args => Navigation.NavigateTo($"/projects/{args.Item.Id}"))">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="new Func<ProjectListDto, object>(x => x.ProjectCode)">コード</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<ProjectListDto, object>(x => x.ProjectName)">プロジェクト名</MudTableSortLabel></MudTh>
+            <MudTh>顧客</MudTh>
+            <MudTh>品番</MudTh>
+            <MudTh>型式</MudTh>
+            <MudTh>フェーズ</MudTh>
+            <MudTh>SOP予定日</MudTh>
+            <MudTh>PM</MudTh>
+            <MudTh>進捗</MudTh>
+            <MudTh>ステータス</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="コード">
+                <MudLink Href="@($"/projects/{context.Id}")">@context.ProjectCode</MudLink>
+            </MudTd>
+            <MudTd DataLabel="プロジェクト名">@context.ProjectName</MudTd>
+            <MudTd DataLabel="顧客">@context.CustomerName</MudTd>
+            <MudTd DataLabel="品番">@context.PartNumber</MudTd>
+            <MudTd DataLabel="型式">@context.ModelCode</MudTd>
+            <MudTd DataLabel="フェーズ">
+                <MudChip T="string" Size="Size.Small" Color="GetPhaseColor(context.CurrentPhase)">
+                    @GetPhaseName(context.CurrentPhase)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="SOP予定日">@context.SOPDate?.ToString("yyyy/MM/dd")</MudTd>
+            <MudTd DataLabel="PM">@context.ProjectManagerName</MudTd>
+            <MudTd DataLabel="進捗">
+                <MudProgressLinear Color="Color.Primary" Value="@((double)context.OverallProgress)" Class="my-1"
+                    Style="min-width: 80px;" />
+                <MudText Typo="Typo.caption">@context.OverallProgress.ToString("F0")%</MudText>
+            </MudTd>
+            <MudTd DataLabel="ステータス">
+                <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">
+                    @GetStatusName(context.Status)
+                </MudChip>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                RowsPerPageString="表示件数:" InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<ProjectListDto> _projects = new();
+    private bool _loading = true;
+    private string? _searchTerm;
+    private ProjectStatus? _statusFilter;
+
+    protected override async Task OnInitializedAsync() => await Search();
+
+    private async Task Search()
+    {
+        _loading = true;
+        _projects = await Mediator.Send(new GetProjectListQuery
+        {
+            SearchTerm = _searchTerm,
+            Status = _statusFilter
+        });
+        _loading = false;
+    }
+
+    private void CreateNew() => Navigation.NavigateTo("/projects/create");
+
+    private static string GetPhaseName(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => "計画・定義",
+        APQPPhase.ProductDesign => "製品設計",
+        APQPPhase.ProcessDesign => "工程設計",
+        APQPPhase.Validation => "妥当性確認",
+        APQPPhase.Production => "量産",
+        _ => phase.ToString()
+    };
+
+    private static Color GetPhaseColor(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => Color.Info,
+        APQPPhase.ProductDesign => Color.Primary,
+        APQPPhase.ProcessDesign => Color.Secondary,
+        APQPPhase.Validation => Color.Warning,
+        APQPPhase.Production => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string GetStatusName(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => "下書き",
+        ProjectStatus.Active => "進行中",
+        ProjectStatus.OnHold => "保留",
+        ProjectStatus.Completed => "完了",
+        ProjectStatus.Cancelled => "中止",
+        _ => status.ToString()
+    };
+
+    private static Color GetStatusColor(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => Color.Default,
+        ProjectStatus.Active => Color.Success,
+        ProjectStatus.OnHold => Color.Warning,
+        ProjectStatus.Completed => Color.Info,
+        ProjectStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+}

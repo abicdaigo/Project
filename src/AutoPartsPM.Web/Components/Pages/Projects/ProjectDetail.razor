@@ -1,0 +1,406 @@
+@page "/projects/{Id:int}"
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+
+<PageTitle>@(_project?.ProjectName ?? "プロジェクト詳細") - AutoParts PM</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_project is null)
+{
+    <MudAlert Severity="Severity.Error">プロジェクトが見つかりません</MudAlert>
+}
+else
+{
+    <!-- ヘッダー -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                        OnClick="@(() => Navigation.NavigateTo("/projects"))">
+                        一覧に戻る
+                    </MudButton>
+                    <MudText Typo="Typo.h4" Class="mt-2">@_project.ProjectName</MudText>
+                    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                        @_project.ProjectCode | @_project.CustomerName | 品番: @_project.PartNumber
+                    </MudText>
+                </div>
+                <div>
+                    <MudChip T="string" Color="GetStatusColor(_project.Status)" Size="Size.Large">
+                        @GetStatusName(_project.Status)
+                    </MudChip>
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    <!-- サマリーカード -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">全体進捗</MudText>
+                    <MudProgressLinear Color="Color.Primary" Value="@((double)_project.OverallProgress)"
+                        Class="my-2" />
+                    <MudText Typo="Typo.h5">@_project.OverallProgress.ToString("F0")%</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">現在のフェーズ</MudText>
+                    <MudChip T="string" Color="GetPhaseColor(_project.CurrentPhase)" Class="mt-2">
+                        @GetPhaseName(_project.CurrentPhase)
+                    </MudChip>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">PPAP進捗</MudText>
+                    <MudText Typo="Typo.h5" Class="mt-2">@_project.PPAPCompletedCount / @_project.PPAPTotalCount</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">未解決課題</MudText>
+                    <MudText Typo="Typo.h5" Class="mt-2"
+                        Color="@(_project.OpenIssueCount > 0 ? Color.Warning : Color.Success)">
+                        @_project.OpenIssueCount 件
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- タブ -->
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+        <!-- APQPフェーズ -->
+        <MudTabPanel Text="APQPフェーズ" Icon="@Icons.Material.Filled.Timeline">
+            <MudTimeline TimelineOrientation="TimelineOrientation.Horizontal" TimelinePosition="TimelinePosition.Top">
+                @foreach (var phase in _project.Phases)
+                {
+                    <MudTimelineItem Color="GetPhaseStatusColor(phase.Status)" Size="Size.Medium">
+                        <ItemContent>
+                            <MudCard Elevation="1" Class="pa-2" Style="min-width: 180px;">
+                                <MudText Typo="Typo.subtitle2" Align="Align.Center">@GetPhaseName(phase.Phase)</MudText>
+                                <MudProgressLinear Color="GetPhaseStatusColor(phase.Status)"
+                                    Value="@((double)phase.CompletionRate)" Class="my-2" />
+                                <MudText Typo="Typo.caption" Align="Align.Center">@phase.CompletionRate.ToString("F0")%</MudText>
+                                <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
+                                    成果物: @phase.CompletedDeliverableCount / @phase.DeliverableCount
+                                </MudText>
+                                @if (phase.PlannedEndDate.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Align="Align.Center">
+                                        期限: @phase.PlannedEndDate.Value.ToString("yyyy/MM/dd")
+                                    </MudText>
+                                }
+                            </MudCard>
+                        </ItemContent>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+        </MudTabPanel>
+
+        <!-- ゲートレビュー -->
+        <MudTabPanel Text="ゲートレビュー" Icon="@Icons.Material.Filled.CheckCircle">
+            <MudTable Items="@_project.GateReviews" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>ゲート</MudTh>
+                    <MudTh>レビュー日</MudTh>
+                    <MudTh>判定</MudTh>
+                    <MudTh>レビュアー</MudTh>
+                    <MudTh>備考</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>Gate @context.GateNumber</MudTd>
+                    <MudTd>@context.ReviewDate?.ToString("yyyy/MM/dd")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="GetGateResultColor(context.Result)">
+                            @GetGateResultName(context.Result)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@context.ReviewerName</MudTd>
+                    <MudTd>@context.Notes</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+
+        <!-- PPAP -->
+        <MudTabPanel Text="PPAP" Icon="@Icons.Material.Filled.Description">
+            <MudTable Items="@_project.PPAPDocuments" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>No.</MudTh>
+                    <MudTh>書類名</MudTh>
+                    <MudTh>必須</MudTh>
+                    <MudTh>ステータス</MudTh>
+                    <MudTh>ファイル</MudTh>
+                    <MudTh>承認日</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ElementNumber</MudTd>
+                    <MudTd>@context.ElementName</MudTd>
+                    <MudTd>
+                        @if (context.Required)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="GetDocStatusColor(context.Status)">
+                            @GetDocStatusName(context.Status)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@context.FileName</MudTd>
+                    <MudTd>@context.ApprovedDate?.ToString("yyyy/MM/dd")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+
+        <!-- マイルストーン -->
+        <MudTabPanel Text="マイルストーン" Icon="@Icons.Material.Filled.Flag">
+            <MudTable Items="@_project.Milestones" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>名称</MudTh>
+                    <MudTh>フェーズ</MudTh>
+                    <MudTh>期限</MudTh>
+                    <MudTh>実績日</MudTh>
+                    <MudTh>ステータス</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@GetPhaseName(context.Phase)</MudTd>
+                    <MudTd>@context.DueDate.ToString("yyyy/MM/dd")</MudTd>
+                    <MudTd>@context.ActualDate?.ToString("yyyy/MM/dd")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="GetMilestoneColor(context.Status)">
+                            @GetMilestoneStatusName(context.Status)
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+
+        <!-- 課題 -->
+        <MudTabPanel Text="課題 (@_project.OpenIssueCount)" Icon="@Icons.Material.Filled.BugReport">
+            <MudTable Items="@_project.Issues" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>タイトル</MudTh>
+                    <MudTh>優先度</MudTh>
+                    <MudTh>カテゴリ</MudTh>
+                    <MudTh>担当者</MudTh>
+                    <MudTh>期限</MudTh>
+                    <MudTh>ステータス</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Title</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="GetPriorityColor(context.Priority)">
+                            @GetPriorityName(context.Priority)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@GetCategoryName(context.Category)</MudTd>
+                    <MudTd>@context.AssigneeName</MudTd>
+                    <MudTd>@context.DueDate?.ToString("yyyy/MM/dd")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="GetIssueStatusColor(context.Status)">
+                            @GetIssueStatusName(context.Status)
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+
+        <!-- 設備 -->
+        <MudTabPanel Text="設備" Icon="@Icons.Material.Filled.PrecisionManufacturing">
+            <MudTable Items="@_project.Equipment" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>コード</MudTh>
+                    <MudTh>設備名</MudTh>
+                    <MudTh>種別</MudTh>
+                    <MudTh>納期</MudTh>
+                    <MudTh>ステータス</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.EquipmentCode</MudTd>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@GetEquipmentTypeName(context.Type)</MudTd>
+                    <MudTd>@context.DeliveryDate?.ToString("yyyy/MM/dd")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="GetEquipmentStatusColor(context.Status)">
+                            @GetEquipmentStatusName(context.Status)
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ProjectDetailDto? _project;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _project = await Mediator.Send(new GetProjectDetailQuery(Id));
+        _loading = false;
+    }
+
+    // ヘルパーメソッド
+    private static string GetPhaseName(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => "計画・定義",
+        APQPPhase.ProductDesign => "製品設計",
+        APQPPhase.ProcessDesign => "工程設計",
+        APQPPhase.Validation => "妥当性確認",
+        APQPPhase.Production => "量産",
+        _ => phase.ToString()
+    };
+
+    private static Color GetPhaseColor(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => Color.Info,
+        APQPPhase.ProductDesign => Color.Primary,
+        APQPPhase.ProcessDesign => Color.Secondary,
+        APQPPhase.Validation => Color.Warning,
+        APQPPhase.Production => Color.Success,
+        _ => Color.Default
+    };
+
+    private static Color GetPhaseStatusColor(PhaseStatus status) => status switch
+    {
+        PhaseStatus.NotStarted => Color.Default,
+        PhaseStatus.InProgress => Color.Primary,
+        PhaseStatus.UnderReview => Color.Warning,
+        PhaseStatus.Completed => Color.Success,
+        PhaseStatus.Delayed => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetStatusName(ProjectStatus s) => s switch
+    {
+        ProjectStatus.Draft => "下書き", ProjectStatus.Active => "進行中",
+        ProjectStatus.OnHold => "保留", ProjectStatus.Completed => "完了",
+        ProjectStatus.Cancelled => "中止", _ => s.ToString()
+    };
+
+    private static Color GetStatusColor(ProjectStatus s) => s switch
+    {
+        ProjectStatus.Draft => Color.Default, ProjectStatus.Active => Color.Success,
+        ProjectStatus.OnHold => Color.Warning, ProjectStatus.Completed => Color.Info,
+        ProjectStatus.Cancelled => Color.Error, _ => Color.Default
+    };
+
+    private static string GetGateResultName(GateResult r) => r switch
+    {
+        GateResult.NotReviewed => "未実施", GateResult.Approved => "承認",
+        GateResult.ConditionalApproval => "条件付承認", GateResult.Rejected => "却下",
+        _ => r.ToString()
+    };
+
+    private static Color GetGateResultColor(GateResult r) => r switch
+    {
+        GateResult.NotReviewed => Color.Default, GateResult.Approved => Color.Success,
+        GateResult.ConditionalApproval => Color.Warning, GateResult.Rejected => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetDocStatusName(DocumentStatus s) => s switch
+    {
+        DocumentStatus.NotStarted => "未着手", DocumentStatus.InProgress => "作成中",
+        DocumentStatus.UnderReview => "レビュー中", DocumentStatus.Approved => "承認済",
+        DocumentStatus.Rejected => "却下", _ => s.ToString()
+    };
+
+    private static Color GetDocStatusColor(DocumentStatus s) => s switch
+    {
+        DocumentStatus.NotStarted => Color.Default, DocumentStatus.InProgress => Color.Primary,
+        DocumentStatus.UnderReview => Color.Warning, DocumentStatus.Approved => Color.Success,
+        DocumentStatus.Rejected => Color.Error, _ => Color.Default
+    };
+
+    private static string GetMilestoneStatusName(MilestoneStatus s) => s switch
+    {
+        MilestoneStatus.Pending => "未開始", MilestoneStatus.OnTrack => "順調",
+        MilestoneStatus.AtRisk => "リスクあり", MilestoneStatus.Delayed => "遅延",
+        MilestoneStatus.Completed => "完了", _ => s.ToString()
+    };
+
+    private static Color GetMilestoneColor(MilestoneStatus s) => s switch
+    {
+        MilestoneStatus.Pending => Color.Default, MilestoneStatus.OnTrack => Color.Success,
+        MilestoneStatus.AtRisk => Color.Warning, MilestoneStatus.Delayed => Color.Error,
+        MilestoneStatus.Completed => Color.Info, _ => Color.Default
+    };
+
+    private static string GetPriorityName(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => "低", IssuePriority.Medium => "中",
+        IssuePriority.High => "高", IssuePriority.Critical => "最重要",
+        _ => p.ToString()
+    };
+
+    private static Color GetPriorityColor(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => Color.Default, IssuePriority.Medium => Color.Info,
+        IssuePriority.High => Color.Warning, IssuePriority.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetIssueStatusName(IssueStatus s) => s switch
+    {
+        IssueStatus.Open => "未対応", IssueStatus.InProgress => "対応中",
+        IssueStatus.Resolved => "解決済", IssueStatus.Closed => "クローズ",
+        _ => s.ToString()
+    };
+
+    private static Color GetIssueStatusColor(IssueStatus s) => s switch
+    {
+        IssueStatus.Open => Color.Error, IssueStatus.InProgress => Color.Warning,
+        IssueStatus.Resolved => Color.Success, IssueStatus.Closed => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string GetCategoryName(IssueCategory c) => c switch
+    {
+        IssueCategory.Design => "設計", IssueCategory.Process => "工程",
+        IssueCategory.Quality => "品質", IssueCategory.Equipment => "設備",
+        IssueCategory.Supplier => "サプライヤー", IssueCategory.Other => "その他",
+        _ => c.ToString()
+    };
+
+    private static string GetEquipmentTypeName(EquipmentType t) => t switch
+    {
+        EquipmentType.Mold => "金型", EquipmentType.Jig => "治具",
+        EquipmentType.Fixture => "取付具", EquipmentType.InspectionEquipment => "検査機器",
+        EquipmentType.ProductionMachine => "生産設備", EquipmentType.Other => "その他",
+        _ => t.ToString()
+    };
+
+    private static string GetEquipmentStatusName(EquipmentStatus s) => s switch
+    {
+        EquipmentStatus.Planning => "企画中", EquipmentStatus.Ordered => "発注済",
+        EquipmentStatus.Manufacturing => "製造中", EquipmentStatus.Delivered => "納入済",
+        EquipmentStatus.Installed => "設置済", EquipmentStatus.Operational => "稼働中",
+        _ => s.ToString()
+    };
+
+    private static Color GetEquipmentStatusColor(EquipmentStatus s) => s switch
+    {
+        EquipmentStatus.Planning => Color.Default, EquipmentStatus.Ordered => Color.Info,
+        EquipmentStatus.Manufacturing => Color.Primary, EquipmentStatus.Delivered => Color.Warning,
+        EquipmentStatus.Installed => Color.Secondary, EquipmentStatus.Operational => Color.Success,
+        _ => Color.Default
+    };
+}

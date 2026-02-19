@@ -1,0 +1,204 @@
+@page "/"
+@inject IMediator Mediator
+
+<PageTitle>ダッシュボード - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">ダッシュボード</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <!-- サマリーカード -->
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Large"
+                            Class="mr-3" />
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">全プロジェクト</MudText>
+                            <MudText Typo="Typo.h4">@_projects.Count</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.PlayCircle" Color="Color.Success" Size="Size.Large"
+                            Class="mr-3" />
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">進行中</MudText>
+                            <MudText Typo="Typo.h4">@_activeCount</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large"
+                            Class="mr-3" />
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">保留中</MudText>
+                            <MudText Typo="Typo.h4">@_onHoldCount</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Info" Size="Size.Large"
+                            Class="mr-3" />
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">完了</MudText>
+                            <MudText Typo="Typo.h4">@_completedCount</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- プロジェクト一覧（最新5件） -->
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">最近のプロジェクト</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton Href="/projects" Variant="Variant.Text" Color="Color.Primary">すべて表示</MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudTable Items="@_projects.Take(5)" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm">
+                        <HeaderContent>
+                            <MudTh>コード</MudTh>
+                            <MudTh>プロジェクト名</MudTh>
+                            <MudTh>顧客</MudTh>
+                            <MudTh>フェーズ</MudTh>
+                            <MudTh>進捗</MudTh>
+                            <MudTh>ステータス</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="コード">
+                                <MudLink Href="@($"/projects/{context.Id}")">@context.ProjectCode</MudLink>
+                            </MudTd>
+                            <MudTd DataLabel="プロジェクト名">@context.ProjectName</MudTd>
+                            <MudTd DataLabel="顧客">@context.CustomerName</MudTd>
+                            <MudTd DataLabel="フェーズ">
+                                <MudChip T="string" Size="Size.Small" Color="GetPhaseColor(context.CurrentPhase)">
+                                    @GetPhaseName(context.CurrentPhase)
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="進捗">
+                                <MudProgressLinear Color="Color.Primary" Value="@((double)context.OverallProgress)"
+                                    Class="my-1" />
+                                <MudText Typo="Typo.caption">@context.OverallProgress.ToString("F0")%</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="ステータス">
+                                <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">
+                                    @GetStatusName(context.Status)
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- APQPフェーズ別集計 -->
+        <MudItem xs="12" md="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">APQPフェーズ別</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @foreach (APQPPhase phase in Enum.GetValues<APQPPhase>())
+                    {
+                        var count = _projects.Count(p => p.CurrentPhase == phase && p.Status == ProjectStatus.Active);
+                        <div class="d-flex justify-space-between align-center mb-3">
+                            <MudText Typo="Typo.body2">@GetPhaseName(phase)</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="GetPhaseColor(phase)">@count 件</MudChip>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private List<ProjectListDto> _projects = new();
+    private bool _loading = true;
+    private int _activeCount;
+    private int _onHoldCount;
+    private int _completedCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _projects = await Mediator.Send(new GetProjectListQuery());
+        _activeCount = _projects.Count(p => p.Status == ProjectStatus.Active);
+        _onHoldCount = _projects.Count(p => p.Status == ProjectStatus.OnHold);
+        _completedCount = _projects.Count(p => p.Status == ProjectStatus.Completed);
+        _loading = false;
+    }
+
+    private static string GetPhaseName(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => "計画・定義",
+        APQPPhase.ProductDesign => "製品設計",
+        APQPPhase.ProcessDesign => "工程設計",
+        APQPPhase.Validation => "妥当性確認",
+        APQPPhase.Production => "量産",
+        _ => phase.ToString()
+    };
+
+    private static Color GetPhaseColor(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => Color.Info,
+        APQPPhase.ProductDesign => Color.Primary,
+        APQPPhase.ProcessDesign => Color.Secondary,
+        APQPPhase.Validation => Color.Warning,
+        APQPPhase.Production => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string GetStatusName(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => "下書き",
+        ProjectStatus.Active => "進行中",
+        ProjectStatus.OnHold => "保留",
+        ProjectStatus.Completed => "完了",
+        ProjectStatus.Cancelled => "中止",
+        _ => status.ToString()
+    };
+
+    private static Color GetStatusColor(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => Color.Default,
+        ProjectStatus.Active => Color.Success,
+        ProjectStatus.OnHold => Color.Warning,
+        ProjectStatus.Completed => Color.Info,
+        ProjectStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+}

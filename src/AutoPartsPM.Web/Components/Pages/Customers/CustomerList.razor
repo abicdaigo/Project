@@ -1,0 +1,244 @@
+@page "/customers"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@using AutoPartsPM.Application.Features.Customers.Queries.GetCustomerList
+@using AutoPartsPM.Application.Features.Customers.Commands.CreateCustomer
+@using AutoPartsPM.Application.Features.Customers.Commands.DeleteCustomer
+
+<PageTitle>顧客一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">顧客一覧</MudText>
+
+<!-- 検索・フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField @bind-Value="_searchTerm" Placeholder="検索（顧客コード・顧客名）"
+                Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="Search" />
+        </MudItem>
+        <MudItem xs="12" sm="3" Class="d-flex align-center">
+            <MudCheckBox @bind-Value="_includeInactive" Label="非アクティブを含む"
+                Color="Color.Primary" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search"
+                StartIcon="@Icons.Material.Filled.Search" Class="mt-1">
+                検索
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ToggleCreateForm"
+                StartIcon="@Icons.Material.Filled.Add" FullWidth="true" Class="mt-1">
+                新規顧客登録
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- 新規顧客登録フォーム -->
+@if (_showCreateForm)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">新規顧客登録</MudText>
+        <MudForm @ref="_createForm" Model="@_createCommand">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="_createCommand.CustomerCode" Label="顧客コード *"
+                        Required="true" RequiredError="顧客コードは必須です"
+                        MaxLength="50" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="5">
+                    <MudTextField @bind-Value="_createCommand.CustomerName" Label="顧客名 *"
+                        Required="true" RequiredError="顧客名は必須です"
+                        MaxLength="200" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudTextField @bind-Value="_createCommand.ContactPerson" Label="担当者名"
+                        MaxLength="100" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudTextField @bind-Value="_createCommand.Email" Label="メールアドレス"
+                        MaxLength="200" InputType="InputType.Email" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudTextField @bind-Value="_createCommand.Phone" Label="電話番号"
+                        MaxLength="50" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="5">
+                    <MudTextField @bind-Value="_createCommand.Address" Label="住所"
+                        MaxLength="500" />
+                </MudItem>
+                <MudItem xs="12" Class="d-flex gap-2 mt-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                        OnClick="CreateCustomer" Disabled="@_creating"
+                        StartIcon="@Icons.Material.Filled.Save">
+                        @if (_creating)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        登録
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                        OnClick="CancelCreate"
+                        StartIcon="@Icons.Material.Filled.Cancel">
+                        キャンセル
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </MudPaper>
+}
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@_customers" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading"
+        OnRowClick="NavigateToDetail" T="CustomerListDto">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="new Func<CustomerListDto, object>(x => x.CustomerCode)">顧客コード</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<CustomerListDto, object>(x => x.CustomerName)">顧客名</MudTableSortLabel></MudTh>
+            <MudTh>担当者</MudTh>
+            <MudTh>メールアドレス</MudTh>
+            <MudTh>電話番号</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<CustomerListDto, object>(x => x.ProjectCount)">プロジェクト数</MudTableSortLabel></MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="顧客コード">
+                <MudLink Href="@($"/customers/{context.Id}")">@context.CustomerCode</MudLink>
+            </MudTd>
+            <MudTd DataLabel="顧客名">@context.CustomerName</MudTd>
+            <MudTd DataLabel="担当者">@context.ContactPerson</MudTd>
+            <MudTd DataLabel="メールアドレス">@context.Email</MudTd>
+            <MudTd DataLabel="電話番号">@context.Phone</MudTd>
+            <MudTd DataLabel="プロジェクト数">
+                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                    @context.ProjectCount 件
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="ステータス">
+                <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                    @(context.IsActive ? "アクティブ" : "非アクティブ")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="操作" @onclick:stopPropagation="true">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                    Size="Size.Small" Title="削除"
+                    OnClick="@(() => DeleteCustomer(context))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                RowsPerPageString="表示件数:" InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<CustomerListDto> _customers = new();
+    private bool _loading = true;
+    private string? _searchTerm;
+    private bool _includeInactive = false;
+    private bool _showCreateForm = false;
+    private bool _creating = false;
+    private MudForm? _createForm;
+    private CreateCustomerCommand _createCommand = new();
+
+    protected override async Task OnInitializedAsync() => await Search();
+
+    private async Task Search()
+    {
+        _loading = true;
+        _customers = await Mediator.Send(new GetCustomerListQuery
+        {
+            SearchTerm = _searchTerm,
+            IncludeInactive = _includeInactive
+        });
+        _loading = false;
+    }
+
+    private void NavigateToDetail(TableRowClickEventArgs<CustomerListDto> args)
+        => Navigation.NavigateTo($"/customers/{args.Item.Id}");
+
+    private void ToggleCreateForm()
+    {
+        _showCreateForm = !_showCreateForm;
+        if (_showCreateForm)
+            _createCommand = new CreateCustomerCommand();
+    }
+
+    private void CancelCreate()
+    {
+        _showCreateForm = false;
+        _createCommand = new CreateCustomerCommand();
+    }
+
+    private async Task CreateCustomer()
+    {
+        if (_createForm is not null)
+            await _createForm.Validate();
+
+        if (_createForm?.IsValid != true)
+            return;
+
+        _creating = true;
+        try
+        {
+            var result = await Mediator.Send(_createCommand);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("顧客を登録しました", Severity.Success);
+                _showCreateForm = false;
+                _createCommand = new CreateCustomerCommand();
+                await Search();
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task DeleteCustomer(CustomerListDto customer)
+    {
+        var parameters = new DialogParameters<MudMessageBox>
+        {
+            { x => x.Message, $"顧客「{customer.CustomerName}」を削除してもよろしいですか？" }
+        };
+        var options = new DialogOptions { CloseButton = true };
+        var dialog = await DialogService.ShowMessageBox(
+            "削除確認",
+            $"顧客「{customer.CustomerName}」を削除してもよろしいですか？この操作は取り消せません。",
+            yesText: "削除", cancelText: "キャンセル",
+            options: options);
+
+        if (dialog != true)
+            return;
+
+        var result = await Mediator.Send(new DeleteCustomerCommand(customer.Id));
+        if (result.Succeeded)
+        {
+            Snackbar.Add("顧客を削除しました", Severity.Success);
+            await Search();
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+                Snackbar.Add(error, Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,262 @@
+@page "/ppap"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@using AutoPartsPM.Application.Features.PPAP.Queries.GetPPAPDocumentList
+@using AutoPartsPM.Application.Features.PPAP.Commands.UpdatePPAPDocument
+
+<PageTitle>PPAP書類一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">PPAP書類一覧</MudText>
+
+<!-- フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudNumericField T="int?" Label="プロジェクトID" Value="_filterProjectId"
+                ValueChanged="OnProjectIdChanged"
+                Placeholder="プロジェクトIDで絞り込み"
+                Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="DocumentStatus?" Label="ステータス" Value="_filterStatus"
+                ValueChanged="OnStatusFilterChanged"
+                Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="DocumentStatus?" Value="@(null)">すべて</MudSelectItem>
+                <MudSelectItem T="DocumentStatus?" Value="@((DocumentStatus?)DocumentStatus.NotStarted)">未着手</MudSelectItem>
+                <MudSelectItem T="DocumentStatus?" Value="@((DocumentStatus?)DocumentStatus.InProgress)">作成中</MudSelectItem>
+                <MudSelectItem T="DocumentStatus?" Value="@((DocumentStatus?)DocumentStatus.UnderReview)">審査中</MudSelectItem>
+                <MudSelectItem T="DocumentStatus?" Value="@((DocumentStatus?)DocumentStatus.Approved)">承認済み</MudSelectItem>
+                <MudSelectItem T="DocumentStatus?" Value="@((DocumentStatus?)DocumentStatus.Rejected)">却下</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadDataAsync"
+                StartIcon="@Icons.Material.Filled.Search">
+                検索
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- テーブル -->
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="_documents" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>プロジェクト</MudTh>
+            <MudTh>No.</MudTh>
+            <MudTh>要素名</MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh>提出レベル</MudTh>
+            <MudTh>必須</MudTh>
+            <MudTh>承認日</MudTh>
+            <MudTh>承認者</MudTh>
+            <MudTh>メモ</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudLink OnClick="@(() => ToggleExpand(context.Id))" Style="cursor: pointer;">
+                    @context.ProjectCode - @context.ProjectName
+                </MudLink>
+            </MudTd>
+            <MudTd>@context.ElementNumber</MudTd>
+            <MudTd>@context.ElementName</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetDocStatusColor(context.Status)">
+                    @GetDocStatusName(context.Status)
+                </MudChip>
+            </MudTd>
+            <MudTd>Level @((int)context.SubmissionLevel)</MudTd>
+            <MudTd>
+                @if (context.Required)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Remove" Color="Color.Default" Size="Size.Small" />
+                }
+            </MudTd>
+            <MudTd>@context.ApprovedDate?.ToString("yyyy/MM/dd")</MudTd>
+            <MudTd>@context.ApprovedBy</MudTd>
+            <MudTd>@context.Notes</MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (context.Id == _expandedId)
+            {
+                <MudTr>
+                    <MudTd colspan="9">
+                        <MudPaper Class="pa-4 ma-2" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">
+                                [@context.ElementNumber] @context.ElementName 編集
+                            </MudText>
+                            <MudGrid>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudSelect T="DocumentStatus" Label="ステータス" @bind-Value="_editStatus"
+                                        Variant="Variant.Outlined">
+                                        <MudSelectItem Value="DocumentStatus.NotStarted">未着手</MudSelectItem>
+                                        <MudSelectItem Value="DocumentStatus.InProgress">作成中</MudSelectItem>
+                                        <MudSelectItem Value="DocumentStatus.UnderReview">審査中</MudSelectItem>
+                                        <MudSelectItem Value="DocumentStatus.Approved">承認済み</MudSelectItem>
+                                        <MudSelectItem Value="DocumentStatus.Rejected">却下</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudSelect T="PPAPLevel" Label="提出レベル" @bind-Value="_editSubmissionLevel"
+                                        Variant="Variant.Outlined">
+                                        <MudSelectItem Value="PPAPLevel.Level1">Level 1</MudSelectItem>
+                                        <MudSelectItem Value="PPAPLevel.Level2">Level 2</MudSelectItem>
+                                        <MudSelectItem Value="PPAPLevel.Level3">Level 3</MudSelectItem>
+                                        <MudSelectItem Value="PPAPLevel.Level4">Level 4</MudSelectItem>
+                                        <MudSelectItem Value="PPAPLevel.Level5">Level 5</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudTextField Label="承認者名" @bind-Value="_editApprovedBy"
+                                        Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3" Class="d-flex align-center">
+                                    <MudSwitch T="bool" Label="必須" @bind-Value="_editRequired"
+                                        Color="Color.Primary" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField Label="メモ" @bind-Value="_editNotes"
+                                        Variant="Variant.Outlined" Lines="2" />
+                                </MudItem>
+                            </MudGrid>
+                            <div class="d-flex gap-2 mt-3">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                    StartIcon="@Icons.Material.Filled.Save"
+                                    OnClick="@(() => SaveAsync(context.Id))">
+                                    保存
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                    StartIcon="@Icons.Material.Filled.Close"
+                                    OnClick="CloseExpand">
+                                    キャンセル
+                                </MudButton>
+                            </div>
+                        </MudPaper>
+                    </MudTd>
+                </MudTr>
+            }
+        </ChildRowContent>
+    </MudTable>
+}
+
+@code {
+    private List<PPAPDocumentListDto> _documents = new();
+    private bool _loading = true;
+    private int? _expandedId;
+    private int? _filterProjectId;
+    private DocumentStatus? _filterStatus;
+
+    // 編集フォーム用フィールド
+    private DocumentStatus _editStatus = DocumentStatus.NotStarted;
+    private PPAPLevel _editSubmissionLevel = PPAPLevel.Level3;
+    private bool _editRequired = true;
+    private string? _editNotes;
+    private string? _editApprovedBy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _documents = await Mediator.Send(new GetPPAPDocumentListQuery
+        {
+            ProjectId = _filterProjectId,
+            Status = _filterStatus
+        });
+        _loading = false;
+    }
+
+    private void OnProjectIdChanged(int? value)
+    {
+        _filterProjectId = value;
+    }
+
+    private async Task OnStatusFilterChanged(DocumentStatus? value)
+    {
+        _filterStatus = value;
+        await LoadDataAsync();
+    }
+
+    private void ToggleExpand(int id)
+    {
+        if (_expandedId == id)
+        {
+            CloseExpand();
+            return;
+        }
+
+        var doc = _documents.FirstOrDefault(d => d.Id == id);
+        if (doc is null) return;
+
+        _expandedId = id;
+        _editStatus = doc.Status;
+        _editSubmissionLevel = doc.SubmissionLevel;
+        _editRequired = doc.Required;
+        _editNotes = doc.Notes;
+        _editApprovedBy = doc.ApprovedBy;
+    }
+
+    private void CloseExpand()
+    {
+        _expandedId = null;
+    }
+
+    private async Task SaveAsync(int id)
+    {
+        var result = await Mediator.Send(new UpdatePPAPDocumentCommand
+        {
+            Id = id,
+            Status = _editStatus,
+            SubmissionLevel = _editSubmissionLevel,
+            Required = _editRequired,
+            Notes = _editNotes,
+            ApprovedBy = _editApprovedBy,
+            ApprovedDate = null
+        });
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("PPAPドキュメントを更新しました", Severity.Success);
+            CloseExpand();
+            await LoadDataAsync();
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+                Snackbar.Add(error, Severity.Error);
+        }
+    }
+
+    private static string GetDocStatusName(DocumentStatus s) => s switch
+    {
+        DocumentStatus.NotStarted => "未着手",
+        DocumentStatus.InProgress => "作成中",
+        DocumentStatus.UnderReview => "審査中",
+        DocumentStatus.Approved => "承認済み",
+        DocumentStatus.Rejected => "却下",
+        _ => s.ToString()
+    };
+
+    private static Color GetDocStatusColor(DocumentStatus s) => s switch
+    {
+        DocumentStatus.NotStarted => Color.Default,
+        DocumentStatus.InProgress => Color.Info,
+        DocumentStatus.UnderReview => Color.Warning,
+        DocumentStatus.Approved => Color.Success,
+        DocumentStatus.Rejected => Color.Error,
+        _ => Color.Default
+    };
+}

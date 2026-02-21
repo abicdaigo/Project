@@ -1,0 +1,244 @@
+@page "/gate-reviews"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using AutoPartsPM.Application.Features.GateReviews.Queries.GetGateReviewList
+@using AutoPartsPM.Application.Features.GateReviews.Commands.UpdateGateReview
+
+<PageTitle>ゲートレビュー一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">ゲートレビュー一覧</MudText>
+
+<!-- フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField T="int?" Label="プロジェクトID" Value="_filterProjectId"
+                ValueChanged="OnProjectIdChanged"
+                Placeholder="プロジェクトIDで絞り込み"
+                Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="GateResult?" Label="審査結果" Value="_filterResult"
+                ValueChanged="OnResultFilterChanged"
+                Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="GateResult?" Value="@(null)">すべて</MudSelectItem>
+                <MudSelectItem T="GateResult?" Value="@((GateResult?)GateResult.NotReviewed)">未審査</MudSelectItem>
+                <MudSelectItem T="GateResult?" Value="@((GateResult?)GateResult.Approved)">承認</MudSelectItem>
+                <MudSelectItem T="GateResult?" Value="@((GateResult?)GateResult.ConditionalApproval)">条件付承認</MudSelectItem>
+                <MudSelectItem T="GateResult?" Value="@((GateResult?)GateResult.Rejected)">却下</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadDataAsync"
+                StartIcon="@Icons.Material.Filled.Search">
+                検索
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- テーブル -->
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="_reviews" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>プロジェクト</MudTh>
+            <MudTh>ゲート番号</MudTh>
+            <MudTh>審査日</MudTh>
+            <MudTh>結果</MudTh>
+            <MudTh>審査者</MudTh>
+            <MudTh>メモ</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudLink OnClick="@(() => ToggleExpand(context.Id))" Style="cursor: pointer;">
+                    @context.ProjectCode - @context.ProjectName
+                </MudLink>
+            </MudTd>
+            <MudTd>Gate @context.GateNumber</MudTd>
+            <MudTd>@context.ReviewDate?.ToString("yyyy/MM/dd")</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetGateResultColor(context.Result)">
+                    @GetGateResultName(context.Result)
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.ReviewerName</MudTd>
+            <MudTd>@context.Notes</MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (context.Id == _expandedId)
+            {
+                <MudTr>
+                    <MudTd colspan="6">
+                        <MudPaper Class="pa-4 ma-2" Elevation="0" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">
+                                Gate @context.GateNumber 編集
+                            </MudText>
+                            <MudGrid>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudDatePicker Label="審査日" @bind-Date="_editReviewDate"
+                                        Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudSelect T="GateResult" Label="審査結果" @bind-Value="_editResult"
+                                        Variant="Variant.Outlined">
+                                        <MudSelectItem Value="GateResult.NotReviewed">未審査</MudSelectItem>
+                                        <MudSelectItem Value="GateResult.Approved">承認</MudSelectItem>
+                                        <MudSelectItem Value="GateResult.ConditionalApproval">条件付承認</MudSelectItem>
+                                        <MudSelectItem Value="GateResult.Rejected">却下</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudTextField Label="審査者名" @bind-Value="_editReviewerName"
+                                        Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudTextField Label="審査者ID" @bind-Value="_editReviewerId"
+                                        Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField Label="メモ" @bind-Value="_editNotes"
+                                        Variant="Variant.Outlined" Lines="2" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField Label="アクションアイテム" @bind-Value="_editActionItems"
+                                        Variant="Variant.Outlined" Lines="2" />
+                                </MudItem>
+                            </MudGrid>
+                            <div class="d-flex gap-2 mt-3">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                    StartIcon="@Icons.Material.Filled.Save"
+                                    OnClick="@(() => SaveAsync(context.Id))">
+                                    保存
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                                    StartIcon="@Icons.Material.Filled.Close"
+                                    OnClick="CloseExpand">
+                                    閉じる
+                                </MudButton>
+                            </div>
+                        </MudPaper>
+                    </MudTd>
+                </MudTr>
+            }
+        </ChildRowContent>
+    </MudTable>
+}
+
+@code {
+    private List<GateReviewListDto> _reviews = new();
+    private bool _loading = true;
+    private int? _expandedId;
+    private int? _filterProjectId;
+    private GateResult? _filterResult;
+
+    // 編集フォーム用フィールド
+    private DateTime? _editReviewDate;
+    private GateResult _editResult = GateResult.NotReviewed;
+    private string? _editReviewerName;
+    private string? _editReviewerId;
+    private string? _editNotes;
+    private string? _editActionItems;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _reviews = await Mediator.Send(new GetGateReviewListQuery
+        {
+            ProjectId = _filterProjectId,
+            Result = _filterResult
+        });
+        _loading = false;
+    }
+
+    private void OnProjectIdChanged(int? value)
+    {
+        _filterProjectId = value;
+    }
+
+    private async Task OnResultFilterChanged(GateResult? value)
+    {
+        _filterResult = value;
+        await LoadDataAsync();
+    }
+
+    private void ToggleExpand(int id)
+    {
+        if (_expandedId == id)
+        {
+            CloseExpand();
+            return;
+        }
+
+        var review = _reviews.FirstOrDefault(r => r.Id == id);
+        if (review is null) return;
+
+        _expandedId = id;
+        _editReviewDate = review.ReviewDate;
+        _editResult = review.Result;
+        _editReviewerName = review.ReviewerName;
+        _editReviewerId = null;
+        _editNotes = review.Notes;
+        _editActionItems = null;
+    }
+
+    private void CloseExpand()
+    {
+        _expandedId = null;
+    }
+
+    private async Task SaveAsync(int id)
+    {
+        var result = await Mediator.Send(new UpdateGateReviewCommand
+        {
+            Id = id,
+            ReviewDate = _editReviewDate,
+            Result = _editResult,
+            ReviewerName = _editReviewerName,
+            ReviewerId = _editReviewerId,
+            Notes = _editNotes,
+            ActionItems = _editActionItems
+        });
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("ゲートレビューを更新しました", Severity.Success);
+            CloseExpand();
+            await LoadDataAsync();
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+                Snackbar.Add(error, Severity.Error);
+        }
+    }
+
+    private static string GetGateResultName(GateResult r) => r switch
+    {
+        GateResult.NotReviewed => "未審査",
+        GateResult.Approved => "承認",
+        GateResult.ConditionalApproval => "条件付承認",
+        GateResult.Rejected => "却下",
+        _ => r.ToString()
+    };
+
+    private static Color GetGateResultColor(GateResult r) => r switch
+    {
+        GateResult.NotReviewed => Color.Default,
+        GateResult.Approved => Color.Success,
+        GateResult.ConditionalApproval => Color.Warning,
+        GateResult.Rejected => Color.Error,
+        _ => Color.Default
+    };
+}

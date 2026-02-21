@@ -1,0 +1,133 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = "AdminOnly")]
+@inject IMediator Mediator
+
+<PageTitle>ユーザー管理 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">ユーザー管理</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    Windows Active Directory に基づく認証を使用しています。ユーザーアカウントはADで管理されます。
+</MudAlert>
+
+<!-- 認証方式の説明 -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Security" Class="mr-2" />
+                        認証方式
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="string" Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Check">
+                        <MudText>認証方式: Windows統合認証 (Kerberos/NTLM)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check">
+                        <MudText>ロール管理: Active Directoryグループベース</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check">
+                        <MudText>シングルサインオン: 対応</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check">
+                        <MudText>パスワード管理: AD管理者が対応</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                        アカウント管理について
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    ユーザーアカウントの作成・削除・パスワードリセットは、Active Directory管理者にお問い合わせください。
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    ロールの割り当ては、ADグループへの追加・削除によって行われます。
+                    変更はグループポリシーの更新後（最大90分）に反映されます。
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- ADグループとロール説明 -->
+<MudText Typo="Typo.h6" Class="mb-3">ADグループとアクセス権限</MudText>
+<MudTable Items="_adGroups" Hover="true" Dense="true" Elevation="2">
+    <HeaderContent>
+        <MudTh>ADグループ名</MudTh>
+        <MudTh>ロール</MudTh>
+        <MudTh>説明</MudTh>
+        <MudTh>アクセス可能な機能</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="context.Color">
+                @context.GroupName
+            </MudChip>
+        </MudTd>
+        <MudTd>
+            <MudText Typo="Typo.body2" Style="font-weight: bold;">@context.RoleName</MudText>
+        </MudTd>
+        <MudTd>@context.Description</MudTd>
+        <MudTd>
+            <MudText Typo="Typo.caption">@context.AccessDescription</MudText>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+<MudAlert Severity="Severity.Warning" Class="mt-4">
+    ADグループへの追加・削除は、ITシステム管理者にご依頼ください。
+    ロール変更はセキュリティ上の観点から、承認プロセスが必要です。
+</MudAlert>
+
+@code {
+    private readonly List<AdGroupInfo> _adGroups = new()
+    {
+        new AdGroupInfo
+        {
+            GroupName = "PM_Admins",
+            RoleName = "管理者",
+            Description = "システム全体の管理権限を持つ管理者グループ",
+            AccessDescription = "全機能へのアクセス（ユーザー管理、テンプレート管理、システム設定を含む）",
+            Color = Color.Error
+        },
+        new AdGroupInfo
+        {
+            GroupName = "PM_Managers",
+            RoleName = "マネージャー",
+            Description = "プロジェクト管理機能にアクセスできるマネージャーグループ",
+            AccessDescription = "プロジェクト管理機能へのアクセス（プロジェクト作成・編集、ゲートレビュー承認等）",
+            Color = Color.Warning
+        },
+        new AdGroupInfo
+        {
+            GroupName = "PM_Members",
+            RoleName = "メンバー",
+            Description = "参照・更新機能にアクセスできる一般メンバーグループ",
+            AccessDescription = "参照・更新機能へのアクセス（データ閲覧、マイルストーン・課題の更新等）",
+            Color = Color.Info
+        }
+    };
+
+    private class AdGroupInfo
+    {
+        public string GroupName { get; set; } = string.Empty;
+        public string RoleName { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string AccessDescription { get; set; } = string.Empty;
+        public Color Color { get; set; }
+    }
+}

@@ -1,0 +1,102 @@
+@page "/admin/settings"
+@attribute [Authorize(Policy = "AdminOnly")]
+
+<PageTitle>システム設定 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">システム設定</MudText>
+
+<!-- アプリケーション情報 -->
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+        アプリケーション情報
+    </MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">バージョン</MudText>
+            <MudText Typo="Typo.body1">1.0.0</MudText>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">フレームワーク</MudText>
+            <MudText Typo="Typo.body1">ASP.NET Core .NET 9 / Blazor Server</MudText>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">データベース</MudText>
+            <MudText Typo="Typo.body1">SQL Server</MudText>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">認証方式</MudText>
+            <MudText Typo="Typo.body1">Windows統合認証</MudText>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudDivider Class="mb-4" />
+
+<!-- APQP設定 -->
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.Timeline" Class="mr-2" />
+        APQP設定
+    </MudText>
+    <MudAlert Severity="Severity.Info" Class="mb-3">
+        APQP設定はシステム固定値です。変更が必要な場合はシステム管理者にお問い合わせください。
+    </MudAlert>
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="1" Class="pa-3" Style="text-align: center;">
+                <MudText Typo="Typo.h3" Color="Color.Primary">5</MudText>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">標準フェーズ数</MudText>
+                <MudText Typo="Typo.caption">計画・定義、製品設計、工程設計、妥当性確認、量産</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="1" Class="pa-3" Style="text-align: center;">
+                <MudText Typo="Typo.h3" Color="Color.Secondary">18</MudText>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">PPAP書類数</MudText>
+                <MudText Typo="Typo.caption">AIAG PPAP第4版準拠</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Elevation="1" Class="pa-3" Style="text-align: center;">
+                <MudText Typo="Typo.h3" Color="Color.Info">5</MudText>
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">ゲートレビュー数</MudText>
+                <MudText Typo="Typo.caption">Gate 1 〜 Gate 5</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudDivider Class="mb-4" />
+
+<!-- ログ設定 -->
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.Article" Class="mr-2" />
+        ログ設定
+    </MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">ログレベル</MudText>
+            <div class="d-flex align-center mt-1">
+                <MudChip T="string" Color="Color.Info" Size="Size.Small">Information</MudChip>
+            </div>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">ログ保存先</MudText>
+            <MudText Typo="Typo.body1" Style="font-family: monospace;">logs/log-{date}.txt</MudText>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">保存期間</MudText>
+            <MudText Typo="Typo.body1">31日 (ローリング)</MudText>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudAlert Severity="Severity.Warning">
+    現時点では設定変更機能は実装されていません。設定の変更は appsettings.json ファイルを直接編集するか、
+    システム管理者にお問い合わせください。
+</MudAlert>
+
+@code {
+}

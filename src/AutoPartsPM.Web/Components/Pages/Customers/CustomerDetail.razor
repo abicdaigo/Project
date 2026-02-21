@@ -1,0 +1,326 @@
+@page "/customers/{Id:int}"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@using AutoPartsPM.Application.Features.Customers.Queries.GetCustomerDetail
+@using AutoPartsPM.Application.Features.Customers.Commands.UpdateCustomer
+
+<PageTitle>@(_customer?.CustomerName ?? "顧客詳細") - AutoParts PM</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_customer is null)
+{
+    <MudAlert Severity="Severity.Error">顧客が見つかりません</MudAlert>
+}
+else
+{
+    <!-- ヘッダー -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                        OnClick="@(() => Navigation.NavigateTo("/customers"))">
+                        一覧に戻る
+                    </MudButton>
+                    <div class="d-flex align-center gap-2 mt-2">
+                        <MudText Typo="Typo.h4">@_customer.CustomerName</MudText>
+                        <MudChip T="string" Color="@(_customer.IsActive ? Color.Success : Color.Default)" Size="Size.Medium">
+                            @(_customer.IsActive ? "アクティブ" : "非アクティブ")
+                        </MudChip>
+                    </div>
+                    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                        顧客コード: @_customer.CustomerCode
+                    </MudText>
+                </div>
+                <div>
+                    @if (!_isEditing)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                            OnClick="StartEditing"
+                            StartIcon="@Icons.Material.Filled.Edit">
+                            編集
+                        </MudButton>
+                    }
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    <!-- タブ -->
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+
+        <!-- 基本情報 -->
+        <MudTabPanel Text="基本情報" Icon="@Icons.Material.Filled.Info">
+            @if (_isEditing)
+            {
+                <MudForm @ref="_editForm" Model="@_editCommand">
+                    <MudGrid>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudTextField @bind-Value="_editCommand.CustomerCode" Label="顧客コード *"
+                                Required="true" RequiredError="顧客コードは必須です"
+                                MaxLength="50" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="5">
+                            <MudTextField @bind-Value="_editCommand.CustomerName" Label="顧客名 *"
+                                Required="true" RequiredError="顧客名は必須です"
+                                MaxLength="200" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudTextField @bind-Value="_editCommand.ContactPerson" Label="担当者名"
+                                MaxLength="100" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudTextField @bind-Value="_editCommand.Email" Label="メールアドレス"
+                                MaxLength="200" InputType="InputType.Email" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudTextField @bind-Value="_editCommand.Phone" Label="電話番号"
+                                MaxLength="50" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="5">
+                            <MudTextField @bind-Value="_editCommand.Address" Label="住所"
+                                MaxLength="500" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex align-center">
+                            <MudCheckBox @bind-Value="_editCommand.IsActive" Label="アクティブ"
+                                Color="Color.Primary" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex gap-2 mt-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                OnClick="SaveChanges" Disabled="@_saving"
+                                StartIcon="@Icons.Material.Filled.Save">
+                                @if (_saving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                }
+                                保存
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                                OnClick="CancelEditing"
+                                StartIcon="@Icons.Material.Filled.Cancel">
+                                キャンセル
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+            else
+            {
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">顧客コード</MudText>
+                            <MudText Typo="Typo.body1">@_customer.CustomerCode</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="8">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">顧客名</MudText>
+                            <MudText Typo="Typo.body1">@_customer.CustomerName</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">担当者名</MudText>
+                            <MudText Typo="Typo.body1">@(_customer.ContactPerson ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">メールアドレス</MudText>
+                            <MudText Typo="Typo.body1">@(_customer.Email ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">電話番号</MudText>
+                            <MudText Typo="Typo.body1">@(_customer.Phone ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">住所</MudText>
+                            <MudText Typo="Typo.body1">@(_customer.Address ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">登録日時</MudText>
+                            <MudText Typo="Typo.body1">@_customer.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">最終更新日時</MudText>
+                            <MudText Typo="Typo.body1">@_customer.UpdatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudTabPanel>
+
+        <!-- プロジェクト一覧 -->
+        <MudTabPanel Text="@($"プロジェクト一覧 ({_customer.Projects.Count})")" Icon="@Icons.Material.Filled.AccountTree">
+            @if (_customer.Projects.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">この顧客に紐付くプロジェクトはありません</MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@_customer.Projects" Hover="true" Dense="true"
+                    OnRowClick="NavigateToProject" T="CustomerProjectDto">
+                    <HeaderContent>
+                        <MudTh>プロジェクトコード</MudTh>
+                        <MudTh>プロジェクト名</MudTh>
+                        <MudTh>フェーズ</MudTh>
+                        <MudTh>SOP予定日</MudTh>
+                        <MudTh>プロジェクトマネージャー</MudTh>
+                        <MudTh>ステータス</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="プロジェクトコード">
+                            <MudLink Href="@($"/projects/{context.Id}")">@context.ProjectCode</MudLink>
+                        </MudTd>
+                        <MudTd DataLabel="プロジェクト名">@context.ProjectName</MudTd>
+                        <MudTd DataLabel="フェーズ">
+                            <MudChip T="string" Size="Size.Small" Color="GetPhaseColor(context.CurrentPhase)">
+                                @GetPhaseName(context.CurrentPhase)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="SOP予定日">@context.SOPDate?.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd DataLabel="プロジェクトマネージャー">@context.ProjectManagerName</MudTd>
+                        <MudTd DataLabel="ステータス">
+                            <MudChip T="string" Size="Size.Small" Color="GetStatusColor(context.Status)">
+                                @GetStatusName(context.Status)
+                            </MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50 }"
+                            RowsPerPageString="表示件数:" InfoFormat="{first_item}-{last_item} / {all_items}" />
+                    </PagerContent>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private CustomerDetailDto? _customer;
+    private bool _loading = true;
+    private bool _isEditing = false;
+    private bool _saving = false;
+    private MudForm? _editForm;
+    private UpdateCustomerCommand _editCommand = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customer = await Mediator.Send(new GetCustomerDetailQuery(Id));
+        _loading = false;
+    }
+
+    private void NavigateToProject(TableRowClickEventArgs<CustomerProjectDto> args)
+        => Navigation.NavigateTo($"/projects/{args.Item.Id}");
+
+    private void StartEditing()
+    {
+        if (_customer is null) return;
+        _editCommand = new UpdateCustomerCommand
+        {
+            Id = _customer.Id,
+            CustomerCode = _customer.CustomerCode,
+            CustomerName = _customer.CustomerName,
+            ContactPerson = _customer.ContactPerson,
+            Email = _customer.Email,
+            Phone = _customer.Phone,
+            Address = _customer.Address,
+            IsActive = _customer.IsActive
+        };
+        _isEditing = true;
+    }
+
+    private void CancelEditing()
+    {
+        _isEditing = false;
+        _editCommand = new UpdateCustomerCommand();
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_editForm is not null)
+            await _editForm.Validate();
+
+        if (_editForm?.IsValid != true)
+            return;
+
+        _saving = true;
+        try
+        {
+            var result = await Mediator.Send(_editCommand);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("顧客情報を更新しました", Severity.Success);
+                _isEditing = false;
+                _customer = await Mediator.Send(new GetCustomerDetailQuery(Id));
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string GetPhaseName(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => "計画・定義",
+        APQPPhase.ProductDesign => "製品設計",
+        APQPPhase.ProcessDesign => "工程設計",
+        APQPPhase.Validation => "妥当性確認",
+        APQPPhase.Production => "量産",
+        _ => phase.ToString()
+    };
+
+    private static Color GetPhaseColor(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => Color.Info,
+        APQPPhase.ProductDesign => Color.Primary,
+        APQPPhase.ProcessDesign => Color.Secondary,
+        APQPPhase.Validation => Color.Warning,
+        APQPPhase.Production => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string GetStatusName(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => "下書き",
+        ProjectStatus.Active => "進行中",
+        ProjectStatus.OnHold => "保留",
+        ProjectStatus.Completed => "完了",
+        ProjectStatus.Cancelled => "中止",
+        _ => status.ToString()
+    };
+
+    private static Color GetStatusColor(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => Color.Default,
+        ProjectStatus.Active => Color.Success,
+        ProjectStatus.OnHold => Color.Warning,
+        ProjectStatus.Completed => Color.Info,
+        ProjectStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+}

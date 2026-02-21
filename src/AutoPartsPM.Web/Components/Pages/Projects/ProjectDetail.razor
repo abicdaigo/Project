@@ -190,7 +190,7 @@ else
         </MudTabPanel>
 
         <!-- 課題 -->
-        <MudTabPanel Text="課題 (@_project.OpenIssueCount)" Icon="@Icons.Material.Filled.BugReport">
+        <MudTabPanel Text=@($"課題 ({_project.OpenIssueCount})") Icon="@Icons.Material.Filled.BugReport">
             <MudTable Items="@_project.Issues" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>タイトル</MudTh>

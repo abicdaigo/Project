@@ -1,0 +1,370 @@
+@page "/issues/{Id:int}"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using AutoPartsPM.Application.Features.Issues.Queries.GetIssueDetail
+@using AutoPartsPM.Application.Features.Issues.Commands.UpdateIssue
+
+<PageTitle>@(_issue?.Title ?? "課題詳細") - AutoParts PM</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_issue is null)
+{
+    <MudAlert Severity="Severity.Error">課題が見つかりません</MudAlert>
+}
+else
+{
+    <!-- ヘッダー -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12">
+            <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                <div>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                        OnClick="@(() => Navigation.NavigateTo("/issues"))">
+                        一覧に戻る
+                    </MudButton>
+                    <MudText Typo="Typo.h4" Class="mt-2">@_issue.Title</MudText>
+                    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                        @_issue.ProjectCode | @_issue.ProjectName
+                    </MudText>
+                </div>
+                <div class="d-flex gap-2 align-center">
+                    <MudChip T="string" Color="GetPriorityColor(_issue.Priority)" Size="Size.Large">
+                        @GetPriorityName(_issue.Priority)
+                    </MudChip>
+                    <MudChip T="string" Color="GetIssueStatusColor(_issue.Status)" Size="Size.Large">
+                        @GetIssueStatusName(_issue.Status)
+                    </MudChip>
+                    @if (!_isEditing)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                            StartIcon="@Icons.Material.Filled.Edit"
+                            OnClick="@(() => StartEditing())">
+                            編集
+                        </MudButton>
+                    }
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    @if (!_isEditing)
+    {
+        <!-- 詳細表示モード -->
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudCard Elevation="1" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">課題詳細</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">カテゴリ</MudText>
+                                <MudText>@GetCategoryName(_issue.Category)</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">担当者</MudText>
+                                <MudText>@(_issue.AssigneeName ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">期限日</MudText>
+                                <MudText>@(_issue.DueDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">関連フェーズ</MudText>
+                                <MudText>@(_issue.RelatedPhase.HasValue ? GetPhaseName(_issue.RelatedPhase.Value) : "-")</MudText>
+                            </MudItem>
+                            @if (!string.IsNullOrWhiteSpace(_issue.Description))
+                            {
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">説明</MudText>
+                                    <MudText Style="white-space: pre-wrap;">@_issue.Description</MudText>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </MudCardContent>
+                </MudCard>
+
+                @if (_issue.Status == IssueStatus.Resolved || _issue.Status == IssueStatus.Closed)
+                {
+                    <MudCard Elevation="1" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">解決情報</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">解決日</MudText>
+                                    <MudText>@(_issue.ResolvedDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">解決内容</MudText>
+                                    <MudText Style="white-space: pre-wrap;">@(_issue.Resolution ?? "-")</MudText>
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">根本原因</MudText>
+                                    <MudText Style="white-space: pre-wrap;">@(_issue.RootCause ?? "-")</MudText>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="1" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">登録情報</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">登録日時</MudText>
+                        <MudText>@_issue.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mt-2">登録者</MudText>
+                        <MudText>@_issue.CreatedBy</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mt-2">最終更新</MudText>
+                        <MudText>@_issue.UpdatedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <!-- 編集モード -->
+        <MudCard Elevation="1" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">課題編集</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_editTitle" Label="タイトル" Required="true"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_editDescription" Label="説明" Lines="4"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="IssuePriority" @bind-Value="_editPriority" Label="優先度"
+                            Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (IssuePriority p in Enum.GetValues<IssuePriority>())
+                            {
+                                <MudSelectItem Value="@p">@GetPriorityName(p)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="IssueStatus" @bind-Value="_editStatus" Label="ステータス"
+                            Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (IssueStatus s in Enum.GetValues<IssueStatus>())
+                            {
+                                <MudSelectItem Value="@s">@GetIssueStatusName(s)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="IssueCategory" @bind-Value="_editCategory" Label="カテゴリ"
+                            Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (IssueCategory c in Enum.GetValues<IssueCategory>())
+                            {
+                                <MudSelectItem Value="@c">@GetCategoryName(c)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_editAssigneeName" Label="担当者名"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_editDueDate" Label="期限日" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="APQPPhase?" @bind-Value="_editRelatedPhase" Label="関連フェーズ"
+                            Clearable="true" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (APQPPhase phase in Enum.GetValues<APQPPhase>())
+                            {
+                                <MudSelectItem Value="@((APQPPhase?)phase)">@GetPhaseName(phase)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    @if (_editStatus == IssueStatus.Resolved || _editStatus == IssueStatus.Closed)
+                    {
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editResolution" Label="解決内容" Lines="3"
+                                Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editRootCause" Label="根本原因" Lines="3"
+                                Variant="Variant.Outlined" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                    StartIcon="@Icons.Material.Filled.Save"
+                    OnClick="SaveChanges" Disabled="@_saving">
+                    保存
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" Class="ml-2"
+                    OnClick="@(() => _isEditing = false)">
+                    キャンセル
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private IssueDetailDto? _issue;
+    private bool _loading = true;
+    private bool _isEditing = false;
+    private bool _saving = false;
+
+    // Edit form fields
+    private string _editTitle = string.Empty;
+    private string? _editDescription;
+    private IssuePriority _editPriority;
+    private IssueStatus _editStatus;
+    private IssueCategory _editCategory;
+    private string? _editAssigneeName;
+    private string? _editAssigneeId;
+    private DateTime? _editDueDate;
+    private APQPPhase? _editRelatedPhase;
+    private string? _editResolution;
+    private string? _editRootCause;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _issue = await Mediator.Send(new GetIssueDetailQuery(Id));
+        _loading = false;
+    }
+
+    private void StartEditing()
+    {
+        if (_issue is null) return;
+        _editTitle = _issue.Title;
+        _editDescription = _issue.Description;
+        _editPriority = _issue.Priority;
+        _editStatus = _issue.Status;
+        _editCategory = _issue.Category;
+        _editAssigneeName = _issue.AssigneeName;
+        _editAssigneeId = _issue.AssigneeId;
+        _editDueDate = _issue.DueDate;
+        _editRelatedPhase = _issue.RelatedPhase;
+        _editResolution = _issue.Resolution;
+        _editRootCause = _issue.RootCause;
+        _isEditing = true;
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_issue is null) return;
+
+        _saving = true;
+        var command = new UpdateIssueCommand
+        {
+            Id = _issue.Id,
+            ProjectId = _issue.ProjectId,
+            Title = _editTitle,
+            Description = _editDescription,
+            Priority = _editPriority,
+            Status = _editStatus,
+            Category = _editCategory,
+            AssigneeId = _editAssigneeId,
+            AssigneeName = _editAssigneeName,
+            DueDate = _editDueDate,
+            ResolvedDate = _issue.ResolvedDate,
+            Resolution = _editResolution,
+            RootCause = _editRootCause,
+            RelatedPhase = _editRelatedPhase
+        };
+
+        var result = await Mediator.Send(command);
+        _saving = false;
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("課題を更新しました", Severity.Success);
+            _isEditing = false;
+            _issue = await Mediator.Send(new GetIssueDetailQuery(Id));
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private static string GetPriorityName(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => "低",
+        IssuePriority.Medium => "中",
+        IssuePriority.High => "高",
+        IssuePriority.Critical => "緊急",
+        _ => p.ToString()
+    };
+
+    private static Color GetPriorityColor(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => Color.Default,
+        IssuePriority.Medium => Color.Info,
+        IssuePriority.High => Color.Warning,
+        IssuePriority.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetIssueStatusName(IssueStatus s) => s switch
+    {
+        IssueStatus.Open => "未対応",
+        IssueStatus.InProgress => "対応中",
+        IssueStatus.Resolved => "解決済み",
+        IssueStatus.Closed => "クローズ",
+        _ => s.ToString()
+    };
+
+    private static Color GetIssueStatusColor(IssueStatus s) => s switch
+    {
+        IssueStatus.Open => Color.Error,
+        IssueStatus.InProgress => Color.Warning,
+        IssueStatus.Resolved => Color.Success,
+        IssueStatus.Closed => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string GetCategoryName(IssueCategory c) => c switch
+    {
+        IssueCategory.Design => "設計",
+        IssueCategory.Process => "工程",
+        IssueCategory.Quality => "品質",
+        IssueCategory.Equipment => "設備",
+        IssueCategory.Supplier => "サプライヤー",
+        IssueCategory.Other => "その他",
+        _ => c.ToString()
+    };
+
+    private static string GetPhaseName(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => "計画・定義",
+        APQPPhase.ProductDesign => "製品設計",
+        APQPPhase.ProcessDesign => "工程設計",
+        APQPPhase.Validation => "妥当性確認",
+        APQPPhase.Production => "量産",
+        _ => phase.ToString()
+    };
+}

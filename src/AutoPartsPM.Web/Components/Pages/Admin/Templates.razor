@@ -1,0 +1,179 @@
+@page "/admin/templates"
+@attribute [Authorize(Policy = "AdminOnly")]
+
+<PageTitle>テンプレート管理 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">テンプレート管理</MudText>
+
+<MudAlert Severity="Severity.Info" Class="mb-4">
+    テンプレートのカスタマイズ機能は今後のリリースで提供予定です。現在は標準テンプレートをご利用ください。
+</MudAlert>
+
+<MudGrid>
+    <!-- APQPフェーズテンプレート -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.h6">APQP標準フェーズテンプレート</MudText>
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small">使用中</MudChip>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    IATF 16949に準拠した5フェーズの標準APQP構成です。
+                    プロジェクト作成時に自動的に適用されます。
+                </MudText>
+                <MudDivider Class="mb-3" />
+                <MudText Typo="Typo.subtitle2" Class="mb-2">フェーズ構成:</MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.LooksOne">
+                        <MudText Typo="Typo.body2">計画・定義 (Planning)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.LooksTwo">
+                        <MudText Typo="Typo.body2">製品設計 (Product Design)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Looks3">
+                        <MudText Typo="Typo.body2">工程設計 (Process Design)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Looks4">
+                        <MudText Typo="Typo.body2">妥当性確認 (Validation)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Looks5">
+                        <MudText Typo="Typo.body2">量産 (Production)</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true">
+                    詳細表示
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <!-- PPAPテンプレート -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.h6">PPAP標準書類テンプレート</MudText>
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small">使用中</MudChip>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    AIAG PPAP第4版に準拠した18要素の標準書類リストです。
+                    プロジェクト作成時に自動生成されます。
+                </MudText>
+                <MudDivider Class="mb-3" />
+                <MudText Typo="Typo.subtitle2" Class="mb-2">主要書類 (全18要素):</MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Description">
+                        <MudText Typo="Typo.body2">1. 設計記録</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Description">
+                        <MudText Typo="Typo.body2">2. 設計FMEAの承認</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Description">
+                        <MudText Typo="Typo.body2">3. 工程フロー線図</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Description">
+                        <MudText Typo="Typo.body2">4. 工程FMEA</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Description">
+                        <MudText Typo="Typo.body2">5. コントロールプラン</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.MoreHoriz">
+                        <MudText Typo="Typo.body2">他13要素...</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true">
+                    詳細表示
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <!-- マイルストーンテンプレート -->
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.h6">標準マイルストーンテンプレート</MudText>
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small">使用中</MudChip>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    自動車部品開発における典型的なマイルストーン構成です。
+                    プロジェクトの特性に応じて調整してください。
+                </MudText>
+                <MudDivider Class="mb-3" />
+                <MudText Typo="Typo.subtitle2" Class="mb-2">標準マイルストーン:</MudText>
+                <MudList T="string" Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Flag">
+                        <MudText Typo="Typo.body2">受注確定・プロジェクト開始</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Flag">
+                        <MudText Typo="Typo.body2">コンセプト設計完了</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Flag">
+                        <MudText Typo="Typo.body2">試作品完成</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Flag">
+                        <MudText Typo="Typo.body2">量産設備発注</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Flag">
+                        <MudText Typo="Typo.body2">PPAP承認完了</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Flag">
+                        <MudText Typo="Typo.body2">SOP (量産開始)</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Disabled="true">
+                    詳細表示
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudDivider Class="my-4" />
+
+<MudPaper Elevation="1" Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Schedule" Class="mr-2" />
+        今後のリリース予定
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-2">
+        以下の機能を今後のリリースで提供予定です:
+    </MudText>
+    <MudList T="string" Dense="true">
+        <MudListItem Icon="@Icons.Material.Filled.RadioButtonUnchecked">
+            <MudText Typo="Typo.body2">テンプレートのカスタマイズ機能</MudText>
+        </MudListItem>
+        <MudListItem Icon="@Icons.Material.Filled.RadioButtonUnchecked">
+            <MudText Typo="Typo.body2">業種別・顧客別テンプレートの管理</MudText>
+        </MudListItem>
+        <MudListItem Icon="@Icons.Material.Filled.RadioButtonUnchecked">
+            <MudText Typo="Typo.body2">テンプレートのインポート/エクスポート</MudText>
+        </MudListItem>
+        <MudListItem Icon="@Icons.Material.Filled.RadioButtonUnchecked">
+            <MudText Typo="Typo.body2">プロジェクトからテンプレートを作成する機能</MudText>
+        </MudListItem>
+    </MudList>
+</MudPaper>
+
+@code {
+}

@@ -1,0 +1,119 @@
+@page "/documents"
+@attribute [Authorize]
+@inject IMediator Mediator
+@using AutoPartsPM.Application.Features.Documents.Queries.GetDocumentList
+
+<PageTitle>ドキュメント一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">ドキュメント一覧</MudText>
+
+<!-- 検索フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="6">
+            <MudTextField T="string" Label="ドキュメント名で検索" @bind-Value="_searchTerm"
+                Placeholder="キーワードを入力"
+                Variant="Variant.Outlined"
+                Adornment="Adornment.Start"
+                AdornmentIcon="@Icons.Material.Filled.Search"
+                OnKeyDown="OnSearchKeyDown" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudNumericField T="int?" Label="プロジェクトID" @bind-Value="_filterProjectId"
+                Placeholder="プロジェクトIDで絞り込み"
+                Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" sm="3" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadDataAsync"
+                StartIcon="@Icons.Material.Filled.Search">
+                検索
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- テーブル -->
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="_documents" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>種別</MudTh>
+            <MudTh>プロジェクト</MudTh>
+            <MudTh>ドキュメント名</MudTh>
+            <MudTh>ファイル名</MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh>更新日</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetDocumentTypeColor(context.DocumentType)">
+                    @context.DocumentType
+                </MudChip>
+            </MudTd>
+            <MudTd>@context.ProjectCode - @context.ProjectName</MudTd>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>
+                @if (!string.IsNullOrEmpty(context.FileName))
+                {
+                    <div class="d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2">@context.FileName</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                }
+            </MudTd>
+            <MudTd>@context.Status</MudTd>
+            <MudTd>@context.UpdatedAt?.ToString("yyyy/MM/dd HH:mm")</MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">ドキュメントが見つかりません</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+        合計 @_documents.Count 件
+    </MudText>
+}
+
+@code {
+    private List<DocumentListDto> _documents = new();
+    private bool _loading = true;
+    private string? _searchTerm;
+    private int? _filterProjectId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _documents = await Mediator.Send(new GetDocumentListQuery
+        {
+            ProjectId = _filterProjectId,
+            SearchTerm = _searchTerm
+        });
+        _loading = false;
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await LoadDataAsync();
+    }
+
+    private static Color GetDocumentTypeColor(string documentType) => documentType switch
+    {
+        "PPAP" => Color.Primary,
+        "成果物" => Color.Secondary,
+        _ => Color.Default
+    };
+}

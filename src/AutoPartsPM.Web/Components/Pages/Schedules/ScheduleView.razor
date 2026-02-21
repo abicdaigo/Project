@@ -1,0 +1,462 @@
+@page "/schedules"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@using AutoPartsPM.Application.Features.Milestones.Queries.GetMilestoneList
+@using AutoPartsPM.Application.Features.Milestones.Commands.CreateMilestone
+@using AutoPartsPM.Application.Features.Milestones.Commands.UpdateMilestone
+@using AutoPartsPM.Application.Features.Milestones.Commands.DeleteMilestone
+
+<PageTitle>スケジュール管理 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">スケジュール管理</MudText>
+
+<!-- フィルターパネル -->
+<MudPaper Elevation="1" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudNumericField T="int?" @bind-Value="_filterProjectId" Label="プロジェクトID" Variant="Variant.Outlined"
+                Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="MilestoneStatus?" @bind-Value="_filterStatus" Label="ステータス"
+                Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="MilestoneStatus?" Value="null">すべて</MudSelectItem>
+                <MudSelectItem T="MilestoneStatus?" Value="MilestoneStatus.Pending">予定</MudSelectItem>
+                <MudSelectItem T="MilestoneStatus?" Value="MilestoneStatus.OnTrack">順調</MudSelectItem>
+                <MudSelectItem T="MilestoneStatus?" Value="MilestoneStatus.AtRisk">要注意</MudSelectItem>
+                <MudSelectItem T="MilestoneStatus?" Value="MilestoneStatus.Delayed">遅延</MudSelectItem>
+                <MudSelectItem T="MilestoneStatus?" Value="MilestoneStatus.Completed">完了</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="APQPPhase?" @bind-Value="_filterPhase" Label="フェーズ"
+                Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="APQPPhase?" Value="null">すべて</MudSelectItem>
+                <MudSelectItem T="APQPPhase?" Value="APQPPhase.Planning">計画・定義</MudSelectItem>
+                <MudSelectItem T="APQPPhase?" Value="APQPPhase.ProductDesign">製品設計</MudSelectItem>
+                <MudSelectItem T="APQPPhase?" Value="APQPPhase.ProcessDesign">工程設計</MudSelectItem>
+                <MudSelectItem T="APQPPhase?" Value="APQPPhase.Validation">妥当性確認</MudSelectItem>
+                <MudSelectItem T="APQPPhase?" Value="APQPPhase.Production">量産</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadData"
+                StartIcon="@Icons.Material.Filled.Search">
+                検索
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- 新規作成ボタン -->
+<div class="d-flex justify-end mb-3">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+        StartIcon="@Icons.Material.Filled.Add" OnClick="ShowCreateForm">
+        新規マイルストーン
+    </MudButton>
+</div>
+
+<!-- 新規作成フォーム -->
+@if (_showCreateForm)
+{
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">新規マイルストーン登録</MudText>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudNumericField T="int" @bind-Value="_createModel.ProjectId" Label="プロジェクトID"
+                    Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_createModel.Name" Label="マイルストーン名"
+                    Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_createModel.Description" Label="説明"
+                    Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudDatePicker @bind-Date="_createDueDate" Label="期限日"
+                    Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="APQPPhase" @bind-Value="_createModel.Phase" Label="フェーズ"
+                    Variant="Variant.Outlined">
+                    <MudSelectItem Value="APQPPhase.Planning">計画・定義</MudSelectItem>
+                    <MudSelectItem Value="APQPPhase.ProductDesign">製品設計</MudSelectItem>
+                    <MudSelectItem Value="APQPPhase.ProcessDesign">工程設計</MudSelectItem>
+                    <MudSelectItem Value="APQPPhase.Validation">妥当性確認</MudSelectItem>
+                    <MudSelectItem Value="APQPPhase.Production">量産</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="int" @bind-Value="_createModel.SortOrder" Label="並び順"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateMilestone"
+                    Disabled="_saving" StartIcon="@Icons.Material.Filled.Save">
+                    @(_saving ? "保存中..." : "保存")
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CancelCreate" Class="ml-2">
+                    キャンセル
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+<!-- マイルストーン一覧 -->
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="_milestones" Hover="true" Dense="true" Elevation="2"
+        RowClassFunc="GetRowClass">
+        <HeaderContent>
+            <MudTh>プロジェクト</MudTh>
+            <MudTh>マイルストーン名</MudTh>
+            <MudTh>フェーズ</MudTh>
+            <MudTh>予定日</MudTh>
+            <MudTh>実績日</MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudText Typo="Typo.body2">@context.ProjectCode</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.ProjectName</MudText>
+            </MudTd>
+            <MudTd>
+                @context.Name
+                @if (context.IsOverdue)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Small" Class="ml-1" />
+                }
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetPhaseColor(context.Phase)">
+                    @GetPhaseName(context.Phase)
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudText Color="@(context.IsOverdue ? Color.Error : Color.Default)">
+                    @context.DueDate.ToString("yyyy/MM/dd")
+                </MudText>
+            </MudTd>
+            <MudTd>@context.ActualDate?.ToString("yyyy/MM/dd")</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetMilestoneStatusColor(context.Status)">
+                    @GetMilestoneStatusName(context.Status)
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                    Color="Color.Primary" OnClick="@(() => StartEdit(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                    Color="Color.Error" OnClick="@(() => DeleteMilestone(context.Id))" />
+            </MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (_editingId == context.Id)
+            {
+                <MudTd colspan="7">
+                    <MudPaper Elevation="0" Class="pa-4" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">マイルストーン編集</MudText>
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_editModel.Name" Label="マイルストーン名"
+                                    Variant="Variant.Outlined" Required="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect T="MilestoneStatus" @bind-Value="_editModel.Status" Label="ステータス"
+                                    Variant="Variant.Outlined">
+                                    <MudSelectItem Value="MilestoneStatus.Pending">予定</MudSelectItem>
+                                    <MudSelectItem Value="MilestoneStatus.OnTrack">順調</MudSelectItem>
+                                    <MudSelectItem Value="MilestoneStatus.AtRisk">要注意</MudSelectItem>
+                                    <MudSelectItem Value="MilestoneStatus.Delayed">遅延</MudSelectItem>
+                                    <MudSelectItem Value="MilestoneStatus.Completed">完了</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_editModel.Description" Label="説明"
+                                    Variant="Variant.Outlined" Lines="2" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudDatePicker @bind-Date="_editDueDate" Label="予定日"
+                                    Variant="Variant.Outlined" Required="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudDatePicker @bind-Date="_editActualDate" Label="実績日"
+                                    Variant="Variant.Outlined" Clearable="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudSelect T="APQPPhase" @bind-Value="_editModel.Phase" Label="フェーズ"
+                                    Variant="Variant.Outlined">
+                                    <MudSelectItem Value="APQPPhase.Planning">計画・定義</MudSelectItem>
+                                    <MudSelectItem Value="APQPPhase.ProductDesign">製品設計</MudSelectItem>
+                                    <MudSelectItem Value="APQPPhase.ProcessDesign">工程設計</MudSelectItem>
+                                    <MudSelectItem Value="APQPPhase.Validation">妥当性確認</MudSelectItem>
+                                    <MudSelectItem Value="APQPPhase.Production">量産</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudNumericField T="int" @bind-Value="_editModel.SortOrder" Label="並び順"
+                                    Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                    OnClick="SaveEdit" Disabled="_saving"
+                                    StartIcon="@Icons.Material.Filled.Save">
+                                    @(_saving ? "保存中..." : "保存")
+                                </MudButton>
+                                <MudButton Variant="Variant.Text" Color="Color.Default"
+                                    OnClick="CancelEdit" Class="ml-2">
+                                    キャンセル
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                </MudTd>
+            }
+        </ChildRowContent>
+        <NoRecordsContent>
+            <MudText>マイルストーンが見つかりません</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<MilestoneListDto> _milestones = new();
+    private bool _loading = true;
+    private bool _saving = false;
+    private bool _showCreateForm = false;
+
+    // フィルター
+    private int? _filterProjectId;
+    private MilestoneStatus? _filterStatus;
+    private APQPPhase? _filterPhase;
+
+    // 新規作成
+    private CreateMilestoneModel _createModel = new();
+    private DateTime? _createDueDate;
+
+    // 編集
+    private int? _editingId;
+    private EditMilestoneModel _editModel = new();
+    private DateTime? _editDueDate;
+    private DateTime? _editActualDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _milestones = await Mediator.Send(new GetMilestoneListQuery
+        {
+            ProjectId = _filterProjectId,
+            Status = _filterStatus,
+            Phase = _filterPhase
+        });
+        _loading = false;
+    }
+
+    private void ShowCreateForm()
+    {
+        _showCreateForm = true;
+        _createModel = new CreateMilestoneModel();
+        _createDueDate = null;
+    }
+
+    private void CancelCreate()
+    {
+        _showCreateForm = false;
+        _createModel = new CreateMilestoneModel();
+        _createDueDate = null;
+    }
+
+    private async Task CreateMilestone()
+    {
+        if (_createDueDate == null)
+        {
+            Snackbar.Add("期限日を入力してください", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        var command = new CreateMilestoneCommand
+        {
+            ProjectId = _createModel.ProjectId,
+            Name = _createModel.Name,
+            Description = _createModel.Description,
+            DueDate = _createDueDate.Value,
+            Phase = _createModel.Phase,
+            SortOrder = _createModel.SortOrder
+        };
+
+        var result = await Mediator.Send(command);
+        _saving = false;
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("マイルストーンを作成しました", Severity.Success);
+            _showCreateForm = false;
+            _createModel = new CreateMilestoneModel();
+            _createDueDate = null;
+            await LoadData();
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private void StartEdit(MilestoneListDto milestone)
+    {
+        _editingId = milestone.Id;
+        _editModel = new EditMilestoneModel
+        {
+            Id = milestone.Id,
+            Name = milestone.Name,
+            Description = milestone.Description,
+            Status = milestone.Status,
+            Phase = milestone.Phase,
+            SortOrder = milestone.SortOrder
+        };
+        _editDueDate = milestone.DueDate;
+        _editActualDate = milestone.ActualDate;
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null;
+        _editModel = new EditMilestoneModel();
+        _editDueDate = null;
+        _editActualDate = null;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (_editDueDate == null)
+        {
+            Snackbar.Add("予定日を入力してください", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        var command = new UpdateMilestoneCommand
+        {
+            Id = _editModel.Id,
+            Name = _editModel.Name,
+            Description = _editModel.Description,
+            DueDate = _editDueDate.Value,
+            ActualDate = _editActualDate,
+            Status = _editModel.Status,
+            Phase = _editModel.Phase,
+            SortOrder = _editModel.SortOrder
+        };
+
+        var result = await Mediator.Send(command);
+        _saving = false;
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("保存しました", Severity.Success);
+            _editingId = null;
+            await LoadData();
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private async Task DeleteMilestone(int id)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "削除確認",
+            "このマイルストーンを削除しますか？",
+            yesText: "削除", cancelText: "キャンセル");
+        if (result == true)
+        {
+            var deleteResult = await Mediator.Send(new DeleteMilestoneCommand { Id = id });
+            if (deleteResult.Succeeded)
+                Snackbar.Add("削除しました", Severity.Success);
+            else
+                Snackbar.Add(string.Join(", ", deleteResult.Errors), Severity.Error);
+            await LoadData();
+        }
+    }
+
+    private string GetRowClass(MilestoneListDto item, int index)
+    {
+        return item.IsOverdue ? "mud-theme-error" : string.Empty;
+    }
+
+    // ヘルパーメソッド
+    private static string GetMilestoneStatusName(MilestoneStatus s) => s switch
+    {
+        MilestoneStatus.Pending => "予定",
+        MilestoneStatus.OnTrack => "順調",
+        MilestoneStatus.AtRisk => "要注意",
+        MilestoneStatus.Delayed => "遅延",
+        MilestoneStatus.Completed => "完了",
+        _ => s.ToString()
+    };
+
+    private static Color GetMilestoneStatusColor(MilestoneStatus s) => s switch
+    {
+        MilestoneStatus.Pending => Color.Default,
+        MilestoneStatus.OnTrack => Color.Success,
+        MilestoneStatus.AtRisk => Color.Warning,
+        MilestoneStatus.Delayed => Color.Error,
+        MilestoneStatus.Completed => Color.Info,
+        _ => Color.Default
+    };
+
+    private static string GetPhaseName(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => "計画・定義",
+        APQPPhase.ProductDesign => "製品設計",
+        APQPPhase.ProcessDesign => "工程設計",
+        APQPPhase.Validation => "妥当性確認",
+        APQPPhase.Production => "量産",
+        _ => phase.ToString()
+    };
+
+    private static Color GetPhaseColor(APQPPhase phase) => phase switch
+    {
+        APQPPhase.Planning => Color.Info,
+        APQPPhase.ProductDesign => Color.Primary,
+        APQPPhase.ProcessDesign => Color.Secondary,
+        APQPPhase.Validation => Color.Warning,
+        APQPPhase.Production => Color.Success,
+        _ => Color.Default
+    };
+
+    private class CreateMilestoneModel
+    {
+        public int ProjectId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public APQPPhase Phase { get; set; } = APQPPhase.Planning;
+        public int SortOrder { get; set; }
+    }
+
+    private class EditMilestoneModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public MilestoneStatus Status { get; set; }
+        public APQPPhase Phase { get; set; }
+        public int SortOrder { get; set; }
+    }
+}

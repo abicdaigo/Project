@@ -1,0 +1,281 @@
+@page "/equipment"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using AutoPartsPM.Application.Features.Equipment.Queries.GetEquipmentList
+@using AutoPartsPM.Application.Features.Equipment.Commands.CreateEquipment
+@using AutoPartsPM.Application.Features.Equipment.Commands.DeleteEquipment
+
+<PageTitle>設備一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">設備一覧</MudText>
+
+<!-- 検索・フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField @bind-Value="_searchTerm" Placeholder="設備コード・名称で検索"
+                Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="Search" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="EquipmentStatus?" @bind-Value="_statusFilter" Label="ステータス" Clearable="true"
+                AnchorOrigin="Origin.BottomCenter">
+                @foreach (EquipmentStatus status in Enum.GetValues<EquipmentStatus>())
+                {
+                    <MudSelectItem Value="@((EquipmentStatus?)status)">@GetEquipmentStatusName(status)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="EquipmentType?" @bind-Value="_typeFilter" Label="設備種別" Clearable="true"
+                AnchorOrigin="Origin.BottomCenter">
+                @foreach (EquipmentType type in Enum.GetValues<EquipmentType>())
+                {
+                    <MudSelectItem Value="@((EquipmentType?)type)">@GetEquipmentTypeName(type)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search"
+                StartIcon="@Icons.Material.Filled.Search" Class="mt-1">
+                検索
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+    <MudGrid Class="mt-2">
+        <MudItem xs="12">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                StartIcon="@Icons.Material.Filled.Add"
+                OnClick="@(() => _showCreateForm = !_showCreateForm)">
+                新規設備登録
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- 新規設備登録フォーム -->
+@if (_showCreateForm)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">新規設備登録</MudText>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_newEquipment.ProjectId" Label="プロジェクトID" Required="true"
+                    Min="1" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_newEquipment.EquipmentCode" Label="設備コード" Required="true"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_newEquipment.Name" Label="設備名" Required="true"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="EquipmentType" @bind-Value="_newEquipment.Type" Label="設備種別"
+                    Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (EquipmentType t in Enum.GetValues<EquipmentType>())
+                    {
+                        <MudSelectItem Value="@t">@GetEquipmentTypeName(t)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_newEquipment.Supplier" Label="サプライヤー"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_newDeliveryDate" Label="納入予定日" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_newEquipment.Location" Label="設置場所"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_newEquipment.Cost" Label="費用 (円)" T="decimal?"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_newEquipment.Notes" Label="備考" Lines="2"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudGrid Class="mt-3">
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateEquipment"
+                    StartIcon="@Icons.Material.Filled.Save" Disabled="@_creating">
+                    登録
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" Class="ml-2"
+                    OnClick="@(() => _showCreateForm = false)">
+                    キャンセル
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@_equipment" Hover="true" Breakpoint="Breakpoint.Sm"
+        OnRowClick="NavigateToDetail" T="EquipmentListDto">
+        <HeaderContent>
+            <MudTh>プロジェクト</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<EquipmentListDto, object>(x => x.EquipmentCode)">設備コード</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<EquipmentListDto, object>(x => x.Name)">名称</MudTableSortLabel></MudTh>
+            <MudTh>種別</MudTh>
+            <MudTh>サプライヤー</MudTh>
+            <MudTh>納入予定日</MudTh>
+            <MudTh>費用</MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="プロジェクト">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@context.ProjectCode</MudText>
+                <MudText Typo="Typo.body2">@context.ProjectName</MudText>
+            </MudTd>
+            <MudTd DataLabel="設備コード">
+                <MudLink Href="@($"/equipment/{context.Id}")">@context.EquipmentCode</MudLink>
+            </MudTd>
+            <MudTd DataLabel="名称">@context.Name</MudTd>
+            <MudTd DataLabel="種別">
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                    @GetEquipmentTypeName(context.Type)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="サプライヤー">@context.Supplier</MudTd>
+            <MudTd DataLabel="納入予定日">@context.DeliveryDate?.ToString("yyyy/MM/dd")</MudTd>
+            <MudTd DataLabel="費用">@(context.Cost.HasValue ? context.Cost.Value.ToString("N0") + " 円" : "-")</MudTd>
+            <MudTd DataLabel="ステータス">
+                <MudChip T="string" Size="Size.Small" Color="GetEquipmentStatusColor(context.Status)">
+                    @GetEquipmentStatusName(context.Status)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="操作" @onclick:stopPropagation="true">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                    OnClick="@(() => DeleteEquipment(context.Id))"
+                    Title="削除" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                RowsPerPageString="表示件数:" InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<EquipmentListDto> _equipment = new();
+    private bool _loading = true;
+    private bool _showCreateForm = false;
+    private bool _creating = false;
+    private string? _searchTerm;
+    private EquipmentStatus? _statusFilter;
+    private EquipmentType? _typeFilter;
+    private DateTime? _newDeliveryDate;
+
+    private CreateEquipmentCommand _newEquipment = new CreateEquipmentCommand
+    {
+        Type = EquipmentType.Other
+    };
+
+    protected override async Task OnInitializedAsync() => await Search();
+
+    private void NavigateToDetail(TableRowClickEventArgs<EquipmentListDto> args)
+        => Navigation.NavigateTo($"/equipment/{args.Item.Id}");
+
+    private async Task Search()
+    {
+        _loading = true;
+        _equipment = await Mediator.Send(new GetEquipmentListQuery
+        {
+            SearchTerm = _searchTerm,
+            Status = _statusFilter,
+            Type = _typeFilter
+        });
+        _loading = false;
+    }
+
+    private async Task CreateEquipment()
+    {
+        if (string.IsNullOrWhiteSpace(_newEquipment.EquipmentCode) ||
+            string.IsNullOrWhiteSpace(_newEquipment.Name) ||
+            _newEquipment.ProjectId <= 0)
+        {
+            Snackbar.Add("プロジェクトID、設備コード、設備名は必須です", Severity.Warning);
+            return;
+        }
+
+        _creating = true;
+        var command = _newEquipment with { DeliveryDate = _newDeliveryDate };
+        var result = await Mediator.Send(command);
+        _creating = false;
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("設備を登録しました", Severity.Success);
+            _showCreateForm = false;
+            _newEquipment = new CreateEquipmentCommand { Type = EquipmentType.Other };
+            _newDeliveryDate = null;
+            await Search();
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private async Task DeleteEquipment(int id)
+    {
+        var result = await Mediator.Send(new DeleteEquipmentCommand(id));
+        if (result.Succeeded)
+        {
+            Snackbar.Add("設備を削除しました", Severity.Success);
+            await Search();
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private static string GetEquipmentTypeName(EquipmentType t) => t switch
+    {
+        EquipmentType.Mold => "金型",
+        EquipmentType.Jig => "治具",
+        EquipmentType.Fixture => "取付具",
+        EquipmentType.InspectionEquipment => "検査設備",
+        EquipmentType.ProductionMachine => "生産設備",
+        EquipmentType.Other => "その他",
+        _ => t.ToString()
+    };
+
+    private static string GetEquipmentStatusName(EquipmentStatus s) => s switch
+    {
+        EquipmentStatus.Planning => "計画中",
+        EquipmentStatus.Ordered => "発注済み",
+        EquipmentStatus.Manufacturing => "製作中",
+        EquipmentStatus.Delivered => "納入済み",
+        EquipmentStatus.Installed => "設置済み",
+        EquipmentStatus.Operational => "稼働中",
+        _ => s.ToString()
+    };
+
+    private static Color GetEquipmentStatusColor(EquipmentStatus s) => s switch
+    {
+        EquipmentStatus.Planning => Color.Default,
+        EquipmentStatus.Ordered => Color.Info,
+        EquipmentStatus.Manufacturing => Color.Primary,
+        EquipmentStatus.Delivered => Color.Warning,
+        EquipmentStatus.Installed => Color.Secondary,
+        EquipmentStatus.Operational => Color.Success,
+        _ => Color.Default
+    };
+}

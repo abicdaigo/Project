@@ -1,0 +1,285 @@
+@page "/issues"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using AutoPartsPM.Application.Features.Issues.Queries.GetIssueList
+@using AutoPartsPM.Application.Features.Issues.Commands.CreateIssue
+@using AutoPartsPM.Application.Features.Issues.Commands.DeleteIssue
+
+<PageTitle>課題一覧 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">課題一覧</MudText>
+
+<!-- 検索・フィルター -->
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudTextField @bind-Value="_searchTerm" Placeholder="タイトルで検索"
+                Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="Search" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="IssueStatus?" @bind-Value="_statusFilter" Label="ステータス" Clearable="true"
+                AnchorOrigin="Origin.BottomCenter">
+                @foreach (IssueStatus status in Enum.GetValues<IssueStatus>())
+                {
+                    <MudSelectItem Value="@((IssueStatus?)status)">@GetIssueStatusName(status)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="IssuePriority?" @bind-Value="_priorityFilter" Label="優先度" Clearable="true"
+                AnchorOrigin="Origin.BottomCenter">
+                @foreach (IssuePriority priority in Enum.GetValues<IssuePriority>())
+                {
+                    <MudSelectItem Value="@((IssuePriority?)priority)">@GetPriorityName(priority)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search"
+                StartIcon="@Icons.Material.Filled.Search" Class="mt-1">
+                検索
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+    <MudGrid Class="mt-2">
+        <MudItem xs="12">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                StartIcon="@Icons.Material.Filled.Add"
+                OnClick="@(() => _showCreateForm = !_showCreateForm)">
+                新規課題登録
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<!-- 新規課題登録フォーム -->
+@if (_showCreateForm)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="2">
+        <MudText Typo="Typo.h6" Class="mb-3">新規課題登録</MudText>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_newIssue.ProjectId" Label="プロジェクトID" Required="true"
+                    Min="1" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_newIssue.Title" Label="タイトル" Required="true"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="IssuePriority" @bind-Value="_newIssue.Priority" Label="優先度"
+                    Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (IssuePriority p in Enum.GetValues<IssuePriority>())
+                    {
+                        <MudSelectItem Value="@p">@GetPriorityName(p)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="IssueCategory" @bind-Value="_newIssue.Category" Label="カテゴリ"
+                    Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    @foreach (IssueCategory c in Enum.GetValues<IssueCategory>())
+                    {
+                        <MudSelectItem Value="@c">@GetCategoryName(c)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_newIssueDueDate" Label="期限日" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_newIssue.AssigneeName" Label="担当者名"
+                    Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+        <MudGrid Class="mt-3">
+            <MudItem xs="12">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateIssue"
+                    StartIcon="@Icons.Material.Filled.Save" Disabled="@_creating">
+                    登録
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" Class="ml-2"
+                    OnClick="@(() => _showCreateForm = false)">
+                    キャンセル
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="@_issues" Hover="true" Breakpoint="Breakpoint.Sm"
+        OnRowClick="NavigateToDetail" T="IssueListDto">
+        <HeaderContent>
+            <MudTh>プロジェクト</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<IssueListDto, object>(x => x.Title)">タイトル</MudTableSortLabel></MudTh>
+            <MudTh>優先度</MudTh>
+            <MudTh>カテゴリ</MudTh>
+            <MudTh>担当者</MudTh>
+            <MudTh>期限日</MudTh>
+            <MudTh>ステータス</MudTh>
+            <MudTh>操作</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="プロジェクト">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@context.ProjectCode</MudText>
+                <MudText Typo="Typo.body2">@context.ProjectName</MudText>
+            </MudTd>
+            <MudTd DataLabel="タイトル">
+                <MudLink Href="@($"/issues/{context.Id}")">@context.Title</MudLink>
+            </MudTd>
+            <MudTd DataLabel="優先度">
+                <MudChip T="string" Size="Size.Small" Color="GetPriorityColor(context.Priority)">
+                    @GetPriorityName(context.Priority)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="カテゴリ">@GetCategoryName(context.Category)</MudTd>
+            <MudTd DataLabel="担当者">@context.AssigneeName</MudTd>
+            <MudTd DataLabel="期限日">@context.DueDate?.ToString("yyyy/MM/dd")</MudTd>
+            <MudTd DataLabel="ステータス">
+                <MudChip T="string" Size="Size.Small" Color="GetIssueStatusColor(context.Status)">
+                    @GetIssueStatusName(context.Status)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="操作" @onclick:stopPropagation="true">
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                    OnClick="@(() => DeleteIssue(context.Id))"
+                    Title="削除" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }"
+                RowsPerPageString="表示件数:" InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<IssueListDto> _issues = new();
+    private bool _loading = true;
+    private bool _showCreateForm = false;
+    private bool _creating = false;
+    private string? _searchTerm;
+    private IssueStatus? _statusFilter;
+    private IssuePriority? _priorityFilter;
+    private DateTime? _newIssueDueDate;
+
+    private CreateIssueCommand _newIssue = new CreateIssueCommand
+    {
+        Priority = IssuePriority.Medium,
+        Category = IssueCategory.Other
+    };
+
+    protected override async Task OnInitializedAsync() => await Search();
+
+    private void NavigateToDetail(TableRowClickEventArgs<IssueListDto> args)
+        => Navigation.NavigateTo($"/issues/{args.Item.Id}");
+
+    private async Task Search()
+    {
+        _loading = true;
+        _issues = await Mediator.Send(new GetIssueListQuery
+        {
+            SearchTerm = _searchTerm,
+            Status = _statusFilter,
+            Priority = _priorityFilter
+        });
+        _loading = false;
+    }
+
+    private async Task CreateIssue()
+    {
+        if (string.IsNullOrWhiteSpace(_newIssue.Title) || _newIssue.ProjectId <= 0)
+        {
+            Snackbar.Add("プロジェクトIDとタイトルは必須です", Severity.Warning);
+            return;
+        }
+
+        _creating = true;
+        var command = _newIssue with { DueDate = _newIssueDueDate };
+        var result = await Mediator.Send(command);
+        _creating = false;
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("課題を登録しました", Severity.Success);
+            _showCreateForm = false;
+            _newIssue = new CreateIssueCommand { Priority = IssuePriority.Medium, Category = IssueCategory.Other };
+            _newIssueDueDate = null;
+            await Search();
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private async Task DeleteIssue(int id)
+    {
+        var result = await Mediator.Send(new DeleteIssueCommand(id));
+        if (result.Succeeded)
+        {
+            Snackbar.Add("課題を削除しました", Severity.Success);
+            await Search();
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private static string GetPriorityName(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => "低",
+        IssuePriority.Medium => "中",
+        IssuePriority.High => "高",
+        IssuePriority.Critical => "緊急",
+        _ => p.ToString()
+    };
+
+    private static Color GetPriorityColor(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => Color.Default,
+        IssuePriority.Medium => Color.Info,
+        IssuePriority.High => Color.Warning,
+        IssuePriority.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetIssueStatusName(IssueStatus s) => s switch
+    {
+        IssueStatus.Open => "未対応",
+        IssueStatus.InProgress => "対応中",
+        IssueStatus.Resolved => "解決済み",
+        IssueStatus.Closed => "クローズ",
+        _ => s.ToString()
+    };
+
+    private static Color GetIssueStatusColor(IssueStatus s) => s switch
+    {
+        IssueStatus.Open => Color.Error,
+        IssueStatus.InProgress => Color.Warning,
+        IssueStatus.Resolved => Color.Success,
+        IssueStatus.Closed => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string GetCategoryName(IssueCategory c) => c switch
+    {
+        IssueCategory.Design => "設計",
+        IssueCategory.Process => "工程",
+        IssueCategory.Quality => "品質",
+        IssueCategory.Equipment => "設備",
+        IssueCategory.Supplier => "サプライヤー",
+        IssueCategory.Other => "その他",
+        _ => c.ToString()
+    };
+}

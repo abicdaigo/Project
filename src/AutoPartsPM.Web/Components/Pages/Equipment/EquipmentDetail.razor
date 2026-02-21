@@ -1,0 +1,394 @@
+@page "/equipment/{Id:int}"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@using AutoPartsPM.Application.Features.Equipment.Queries.GetEquipmentDetail
+@using AutoPartsPM.Application.Features.Equipment.Commands.UpdateEquipment
+
+<PageTitle>@(_equipment?.Name ?? "設備詳細") - AutoParts PM</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_equipment is null)
+{
+    <MudAlert Severity="Severity.Error">設備が見つかりません</MudAlert>
+}
+else
+{
+    <!-- ヘッダー -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12">
+            <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                <div>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack"
+                        OnClick="@(() => Navigation.NavigateTo("/equipment"))">
+                        一覧に戻る
+                    </MudButton>
+                    <MudText Typo="Typo.h4" Class="mt-2">@_equipment.Name</MudText>
+                    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                        @_equipment.EquipmentCode | @_equipment.ProjectCode | @_equipment.ProjectName
+                    </MudText>
+                </div>
+                <div class="d-flex gap-2 align-center flex-wrap">
+                    <MudChip T="string" Color="GetEquipmentStatusColor(_equipment.Status)" Size="Size.Large">
+                        @GetEquipmentStatusName(_equipment.Status)
+                    </MudChip>
+                    @if (!_isEditing)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                            StartIcon="@Icons.Material.Filled.Edit"
+                            OnClick="StartEditing">
+                            編集
+                        </MudButton>
+                        @if (GetNextStatus(_equipment.Status) is EquipmentStatus nextStatus)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Success"
+                                StartIcon="@Icons.Material.Filled.ArrowForward"
+                                OnClick="@(() => AdvanceStatus(nextStatus))">
+                                @GetEquipmentStatusName(nextStatus) へ進む
+                            </MudButton>
+                        }
+                    }
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    @if (!_isEditing)
+    {
+        <!-- 詳細表示モード -->
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudCard Elevation="1" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">設備情報</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">設備種別</MudText>
+                                <MudText>@GetEquipmentTypeName(_equipment.Type)</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">サプライヤー</MudText>
+                                <MudText>@(_equipment.Supplier ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">発注日</MudText>
+                                <MudText>@(_equipment.OrderDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">納入予定日</MudText>
+                                <MudText>@(_equipment.DeliveryDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">実際の納入日</MudText>
+                                <MudText>@(_equipment.ActualDeliveryDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">設置場所</MudText>
+                                <MudText>@(_equipment.Location ?? "-")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">費用</MudText>
+                                <MudText>@(_equipment.Cost.HasValue ? _equipment.Cost.Value.ToString("N0") + " 円" : "-")</MudText>
+                            </MudItem>
+                            @if (!string.IsNullOrWhiteSpace(_equipment.Notes))
+                            {
+                                <MudItem xs="12">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">備考</MudText>
+                                    <MudText Style="white-space: pre-wrap;">@_equipment.Notes</MudText>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudCard Elevation="1" Class="mb-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">ステータス履歴</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudTimeline TimelineAlign="TimelineAlign.Start">
+                            @foreach (EquipmentStatus s in Enum.GetValues<EquipmentStatus>())
+                            {
+                                var isPast = (int)s < (int)_equipment.Status;
+                                var isCurrent = s == _equipment.Status;
+                                <MudTimelineItem Color="@(isCurrent ? Color.Primary : isPast ? Color.Success : Color.Default)"
+                                    Size="@(isCurrent ? Size.Medium : Size.Small)">
+                                    <ItemContent>
+                                        <MudText Typo="@(isCurrent ? Typo.subtitle1 : Typo.body2)"
+                                            Color="@(isCurrent ? Color.Primary : isPast ? Color.Success : Color.Default)">
+                                            @GetEquipmentStatusName(s)
+                                        </MudText>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    </MudCardContent>
+                </MudCard>
+
+                <MudCard Elevation="1">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">登録情報</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">登録日時</MudText>
+                        <MudText>@_equipment.CreatedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mt-2">登録者</MudText>
+                        <MudText>@_equipment.CreatedBy</MudText>
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mt-2">最終更新</MudText>
+                        <MudText>@_equipment.UpdatedAt.ToString("yyyy/MM/dd HH:mm")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <!-- 編集モード -->
+        <MudCard Elevation="1" Class="mb-4">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">設備編集</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_editEquipmentCode" Label="設備コード" Required="true"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_editName" Label="設備名" Required="true"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="EquipmentType" @bind-Value="_editType" Label="設備種別"
+                            Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (EquipmentType t in Enum.GetValues<EquipmentType>())
+                            {
+                                <MudSelectItem Value="@t">@GetEquipmentTypeName(t)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="EquipmentStatus" @bind-Value="_editStatus" Label="ステータス"
+                            Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (EquipmentStatus s in Enum.GetValues<EquipmentStatus>())
+                            {
+                                <MudSelectItem Value="@s">@GetEquipmentStatusName(s)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_editSupplier" Label="サプライヤー"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_editLocation" Label="設置場所"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_editOrderDate" Label="発注日" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_editDeliveryDate" Label="納入予定日" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_editActualDeliveryDate" Label="実際の納入日" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField @bind-Value="_editCost" Label="費用 (円)" T="decimal?"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_editNotes" Label="備考" Lines="3"
+                            Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                    StartIcon="@Icons.Material.Filled.Save"
+                    OnClick="SaveChanges" Disabled="@_saving">
+                    保存
+                </MudButton>
+                <MudButton Variant="Variant.Text" Color="Color.Default" Class="ml-2"
+                    OnClick="@(() => _isEditing = false)">
+                    キャンセル
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EquipmentDetailDto? _equipment;
+    private bool _loading = true;
+    private bool _isEditing = false;
+    private bool _saving = false;
+
+    // Edit form fields
+    private string _editEquipmentCode = string.Empty;
+    private string _editName = string.Empty;
+    private EquipmentType _editType;
+    private EquipmentStatus _editStatus;
+    private string? _editSupplier;
+    private string? _editLocation;
+    private string? _editNotes;
+    private decimal? _editCost;
+    private DateTime? _editOrderDate;
+    private DateTime? _editDeliveryDate;
+    private DateTime? _editActualDeliveryDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _equipment = await Mediator.Send(new GetEquipmentDetailQuery(Id));
+        _loading = false;
+    }
+
+    private void StartEditing()
+    {
+        if (_equipment is null) return;
+        _editEquipmentCode = _equipment.EquipmentCode;
+        _editName = _equipment.Name;
+        _editType = _equipment.Type;
+        _editStatus = _equipment.Status;
+        _editSupplier = _equipment.Supplier;
+        _editLocation = _equipment.Location;
+        _editNotes = _equipment.Notes;
+        _editCost = _equipment.Cost;
+        _editOrderDate = _equipment.OrderDate;
+        _editDeliveryDate = _equipment.DeliveryDate;
+        _editActualDeliveryDate = _equipment.ActualDeliveryDate;
+        _isEditing = true;
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_equipment is null) return;
+
+        _saving = true;
+        var command = new UpdateEquipmentCommand
+        {
+            Id = _equipment.Id,
+            ProjectId = _equipment.ProjectId,
+            EquipmentCode = _editEquipmentCode,
+            Name = _editName,
+            Type = _editType,
+            Status = _editStatus,
+            Supplier = _editSupplier,
+            OrderDate = _editOrderDate,
+            DeliveryDate = _editDeliveryDate,
+            ActualDeliveryDate = _editActualDeliveryDate,
+            Location = _editLocation,
+            Notes = _editNotes,
+            Cost = _editCost
+        };
+
+        var result = await Mediator.Send(command);
+        _saving = false;
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add("設備情報を更新しました", Severity.Success);
+            _isEditing = false;
+            _equipment = await Mediator.Send(new GetEquipmentDetailQuery(Id));
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private async Task AdvanceStatus(EquipmentStatus nextStatus)
+    {
+        if (_equipment is null) return;
+
+        var command = new UpdateEquipmentCommand
+        {
+            Id = _equipment.Id,
+            ProjectId = _equipment.ProjectId,
+            EquipmentCode = _equipment.EquipmentCode,
+            Name = _equipment.Name,
+            Type = _equipment.Type,
+            Status = nextStatus,
+            Supplier = _equipment.Supplier,
+            OrderDate = _equipment.OrderDate,
+            DeliveryDate = _equipment.DeliveryDate,
+            ActualDeliveryDate = nextStatus == EquipmentStatus.Delivered ? DateTime.Today : _equipment.ActualDeliveryDate,
+            Location = _equipment.Location,
+            Notes = _equipment.Notes,
+            Cost = _equipment.Cost
+        };
+
+        var result = await Mediator.Send(command);
+
+        if (result.Succeeded)
+        {
+            Snackbar.Add($"ステータスを「{GetEquipmentStatusName(nextStatus)}」に更新しました", Severity.Success);
+            _equipment = await Mediator.Send(new GetEquipmentDetailQuery(Id));
+        }
+        else
+        {
+            Snackbar.Add(string.Join(", ", result.Errors), Severity.Error);
+        }
+    }
+
+    private static EquipmentStatus? GetNextStatus(EquipmentStatus current) => current switch
+    {
+        EquipmentStatus.Planning => EquipmentStatus.Ordered,
+        EquipmentStatus.Ordered => EquipmentStatus.Manufacturing,
+        EquipmentStatus.Manufacturing => EquipmentStatus.Delivered,
+        EquipmentStatus.Delivered => EquipmentStatus.Installed,
+        EquipmentStatus.Installed => EquipmentStatus.Operational,
+        _ => null
+    };
+
+    private static string GetEquipmentTypeName(EquipmentType t) => t switch
+    {
+        EquipmentType.Mold => "金型",
+        EquipmentType.Jig => "治具",
+        EquipmentType.Fixture => "取付具",
+        EquipmentType.InspectionEquipment => "検査設備",
+        EquipmentType.ProductionMachine => "生産設備",
+        EquipmentType.Other => "その他",
+        _ => t.ToString()
+    };
+
+    private static string GetEquipmentStatusName(EquipmentStatus s) => s switch
+    {
+        EquipmentStatus.Planning => "計画中",
+        EquipmentStatus.Ordered => "発注済み",
+        EquipmentStatus.Manufacturing => "製作中",
+        EquipmentStatus.Delivered => "納入済み",
+        EquipmentStatus.Installed => "設置済み",
+        EquipmentStatus.Operational => "稼働中",
+        _ => s.ToString()
+    };
+
+    private static Color GetEquipmentStatusColor(EquipmentStatus s) => s switch
+    {
+        EquipmentStatus.Planning => Color.Default,
+        EquipmentStatus.Ordered => Color.Info,
+        EquipmentStatus.Manufacturing => Color.Primary,
+        EquipmentStatus.Delivered => Color.Warning,
+        EquipmentStatus.Installed => Color.Secondary,
+        EquipmentStatus.Operational => Color.Success,
+        _ => Color.Default
+    };
+}

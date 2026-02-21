@@ -45,7 +45,7 @@
 else
 {
     <MudTable Items="@_projects" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading"
-        OnRowClick="@(args => Navigation.NavigateTo($"/projects/{args.Item.Id}"))">
+        OnRowClick="NavigateToDetail" T="ProjectListDto">
         <HeaderContent>
             <MudTh><MudTableSortLabel SortBy="new Func<ProjectListDto, object>(x => x.ProjectCode)">コード</MudTableSortLabel></MudTh>
             <MudTh><MudTableSortLabel SortBy="new Func<ProjectListDto, object>(x => x.ProjectName)">プロジェクト名</MudTableSortLabel></MudTh>
@@ -111,6 +111,9 @@ else
     }
 
     private void CreateNew() => Navigation.NavigateTo("/projects/create");
+
+    private void NavigateToDetail(TableRowClickEventArgs<ProjectListDto> args)
+        => Navigation.NavigateTo($"/projects/{args.Item.Id}");
 
     private static string GetPhaseName(APQPPhase phase) => phase switch
     {

@@ -1,5 +1,6 @@
 using AutoPartsPM.Application.Common.Interfaces;
 using AutoPartsPM.Infrastructure.Persistence;
+using AutoPartsPM.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,9 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
+
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<IReportService, ExcelReportService>();
 
         return services;
     }

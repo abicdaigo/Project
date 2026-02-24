@@ -5,38 +5,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AutoPartsPM.Application.Features.Projects.Commands.UpdateProject;
 
-public class UpdateProjectCommandHandler : IRequestHandler<UpdateProjectCommand, Result>
+public class UpdateProjectCommandHandler(IApplicationDbContext context)
+    : IRequestHandler<UpdateProjectCommand, Result<int>>
 {
-    private readonly IApplicationDbContext _context;
-    private readonly ICurrentUserService _currentUser;
-
-    public UpdateProjectCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+    public async Task<Result<int>> Handle(UpdateProjectCommand request, CancellationToken cancellationToken)
     {
-        _context = context;
-        _currentUser = currentUser;
-    }
-
-    public async Task<Result> Handle(UpdateProjectCommand request, CancellationToken cancellationToken)
-    {
-        var project = await _context.Projects
-            .FirstOrDefaultAsync(p => p.Id == request.Id, cancellationToken);
-
+        var project = await context.Projects.FindAsync([request.Id], cancellationToken);
         if (project is null)
-            return Result.Failure("プロジェクトが見つかりません");
+            return Result<int>.Failure("プロジェクトが見つかりません");
 
+        // 重複チェック（自身除外）
+        var duplicateCode = await context.Projects
+            .AnyAsync(p => p.ProjectCode == request.ProjectCode && p.Id != request.Id, cancellationToken);
+        if (duplicateCode)
+            return Result<int>.Failure("このプロジェクトコードは既に使用されています");
+
+        project.ProjectCode = request.ProjectCode;
         project.ProjectName = request.ProjectName;
         project.PartNumber = request.PartNumber;
         project.ModelCode = request.ModelCode;
-        project.Status = request.Status;
         project.SOPDate = request.SOPDate;
         project.Description = request.Description;
-        project.ProjectManagerId = request.ProjectManagerId;
         project.ProjectManagerName = request.ProjectManagerName;
-        project.UpdatedAt = DateTime.UtcNow;
-        project.UpdatedBy = _currentUser.UserId ?? "system";
+        project.Status = request.Status;
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return Result.Success();
+        await context.SaveChangesAsync(cancellationToken);
+        return Result<int>.Success(project.Id);
     }
 }

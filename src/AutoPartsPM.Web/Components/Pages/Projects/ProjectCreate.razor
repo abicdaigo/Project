@@ -1,0 +1,294 @@
+@page "/projects/create"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@using AutoPartsPM.Application.Features.Projects.Commands.CreateProject
+@using AutoPartsPM.Application.Features.Customers.Queries.GetCustomerList
+
+<PageTitle>プロジェクト新規作成 - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">プロジェクト新規作成</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">新しいプロジェクトを作成します。APQP5フェーズ・PPAP18書類・ゲートレビューが自動生成されます。</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudCard Elevation="2">
+        <MudCardContent>
+            <!-- ステッパーヘッダー -->
+            <div class="d-flex align-center justify-center mb-6">
+                @for (int i = 0; i < _stepTitles.Length; i++)
+                {
+                    var step = i;
+                    <div class="d-flex align-center">
+                        <div class="d-flex flex-column align-center">
+                            <MudAvatar Color="@(step < _currentStep ? Color.Success : step == _currentStep ? Color.Primary : Color.Default)"
+                                       Size="Size.Medium">
+                                @if (step < _currentStep)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <span>@(step + 1)</span>
+                                }
+                            </MudAvatar>
+                            <MudText Typo="Typo.caption" Class="mt-1" Color="@(step == _currentStep ? Color.Primary : Color.Secondary)">
+                                @_stepTitles[step]
+                            </MudText>
+                        </div>
+                        @if (step < _stepTitles.Length - 1)
+                        {
+                            <MudDivider Style="width: 60px; margin: 0 8px;" />
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Step 0: 基本情報 -->
+            @if (_currentStep == 0)
+            {
+                <MudForm @ref="_form0">
+                    <MudGrid>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_command.ProjectCode"
+                                Label="プロジェクトコード *"
+                                Required="true" RequiredError="プロジェクトコードは必須です"
+                                MaxLength="50"
+                                HelperText="例: PRJ-2026-001" />
+                        </MudItem>
+                        <MudItem xs="12" sm="8">
+                            <MudTextField @bind-Value="_command.ProjectName"
+                                Label="プロジェクト名 *"
+                                Required="true" RequiredError="プロジェクト名は必須です"
+                                MaxLength="200" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_command.PartNumber"
+                                Label="品番 *"
+                                Required="true" RequiredError="品番は必須です"
+                                MaxLength="100" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_command.ModelCode"
+                                Label="車型コード"
+                                MaxLength="50"
+                                HelperText="任意" />
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+
+            <!-- Step 1: 顧客・日程 -->
+            @if (_currentStep == 1)
+            {
+                <MudForm @ref="_form1">
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudAutocomplete T="CustomerListDto"
+                                Label="顧客 *"
+                                @bind-Value="_selectedCustomer"
+                                SearchFunc="SearchCustomers"
+                                ToStringFunc="@(c => c == null ? string.Empty : $"{c.CustomerCode} - {c.CustomerName}")"
+                                Required="true" RequiredError="顧客は必須です"
+                                Dense="true"
+                                Immediate="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker @bind-Date="_sopDate"
+                                Label="SOP予定日"
+                                DateFormat="yyyy/MM/dd" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_command.ProjectManagerName"
+                                Label="プロジェクトマネージャー名"
+                                MaxLength="100" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_command.Description"
+                                Label="説明"
+                                Lines="3"
+                                MaxLength="1000" />
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+
+            <!-- Step 2: 確認 -->
+            @if (_currentStep == 2)
+            {
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Class="mb-4">
+                            以下の内容でプロジェクトを作成します。APQPフェーズ（5フェーズ）・PPAP書類（18書類）・ゲートレビュー（5ゲート）が自動生成されます。
+                        </MudAlert>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">プロジェクトコード</MudText>
+                            <MudText Typo="Typo.body1">@_command.ProjectCode</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="5">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">プロジェクト名</MudText>
+                            <MudText Typo="Typo.body1">@_command.ProjectName</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">品番</MudText>
+                            <MudText Typo="Typo.body1">@_command.PartNumber</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">車型コード</MudText>
+                            <MudText Typo="Typo.body1">@(_command.ModelCode ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="5">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">顧客</MudText>
+                            <MudText Typo="Typo.body1">@(_selectedCustomer != null ? $"{_selectedCustomer.CustomerCode} - {_selectedCustomer.CustomerName}" : "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">SOP予定日</MudText>
+                            <MudText Typo="Typo.body1">@(_sopDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">プロジェクトマネージャー</MudText>
+                            <MudText Typo="Typo.body1">@(_command.ProjectManagerName ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudCardContent>
+        <MudCardActions Class="d-flex justify-space-between pa-4">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                OnClick="GoBack"
+                StartIcon="@Icons.Material.Filled.ArrowBack">
+                @(_currentStep == 0 ? "キャンセル" : "戻る")
+            </MudButton>
+            @if (_currentStep < 2)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                    OnClick="GoNext"
+                    EndIcon="@Icons.Material.Filled.ArrowForward">
+                    次へ
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                    OnClick="Submit" Disabled="@_creating"
+                    StartIcon="@Icons.Material.Filled.Save">
+                    @if (_creating)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    プロジェクトを作成
+                </MudButton>
+            }
+        </MudCardActions>
+    </MudCard>
+}
+
+@code {
+    private readonly string[] _stepTitles = ["基本情報", "顧客・日程", "確認"];
+    private int _currentStep = 0;
+    private bool _loading = true;
+    private bool _creating = false;
+
+    private MudForm? _form0;
+    private MudForm? _form1;
+
+    private CreateProjectCommand _command = new();
+    private CustomerListDto? _selectedCustomer;
+    private DateTime? _sopDate;
+    private List<CustomerListDto> _customers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await Mediator.Send(new GetCustomerListQuery());
+        _loading = false;
+    }
+
+    private async Task<IEnumerable<CustomerListDto>> SearchCustomers(string value, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return _customers;
+        return _customers.Where(c =>
+            c.CustomerName.Contains(value, StringComparison.OrdinalIgnoreCase) ||
+            c.CustomerCode.Contains(value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task GoNext()
+    {
+        if (_currentStep == 0)
+        {
+            await _form0!.Validate();
+            if (!_form0.IsValid) return;
+        }
+        else if (_currentStep == 1)
+        {
+            await _form1!.Validate();
+            if (!_form1.IsValid) return;
+            if (_selectedCustomer == null)
+            {
+                Snackbar.Add("顧客を選択してください", Severity.Warning);
+                return;
+            }
+        }
+        _currentStep++;
+    }
+
+    private void GoBack()
+    {
+        if (_currentStep == 0)
+            Navigation.NavigateTo("/projects");
+        else
+            _currentStep--;
+    }
+
+    private async Task Submit()
+    {
+        if (_selectedCustomer == null)
+        {
+            Snackbar.Add("顧客を選択してください", Severity.Warning);
+            return;
+        }
+
+        _command.CustomerId = _selectedCustomer.Id;
+        _command.SOPDate = _sopDate;
+
+        _creating = true;
+        try
+        {
+            var result = await Mediator.Send(_command);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("プロジェクトを作成しました", Severity.Success);
+                Navigation.NavigateTo($"/projects/{result.Data}");
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+}

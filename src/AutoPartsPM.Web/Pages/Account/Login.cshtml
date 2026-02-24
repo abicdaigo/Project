@@ -1,0 +1,311 @@
+@page
+@model AutoPartsPM.Web.Pages.Account.LoginModel
+@{
+    Layout = null;
+    var pathBase = Configuration["App:PathBase"] ?? "";
+    var windowsSigninUrl = Url.Content("~/account/windows-signin");
+}
+@inject IConfiguration Configuration
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ログイン - AutoParts PM</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0a0e1a 0%, #0d1b2a 40%, #1a0d33 100%);
+            font-family: 'Segoe UI', 'Noto Sans JP', sans-serif;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        /* 背景の装飾パーティクル */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 40%, rgba(99,102,241,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 60%, rgba(139,92,246,0.06) 0%, transparent 50%);
+            animation: bgShift 20s ease infinite alternate;
+        }
+
+        @@keyframes bgShift {
+            from { transform: translate(0, 0) rotate(0deg); }
+            to   { transform: translate(2%, 2%) rotate(1deg); }
+        }
+
+        .login-card {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 1rem;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 20px;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset;
+        }
+
+        /* ロゴ・タイトル */
+        .logo-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .logo-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 16px;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+        }
+        .logo-icon svg { width: 36px; height: 36px; fill: #fff; }
+        .app-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 0.05em;
+        }
+        .app-subtitle {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        /* Windows 認証中スピナー */
+        #windows-auth-section {
+            text-align: center;
+            padding: 1rem 0 0.5rem;
+        }
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(99,102,241,0.2);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        .auth-msg {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        /* ログインフォーム */
+        #login-form-section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        @@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .section-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            text-align: center;
+            margin-bottom: 1.25rem;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group { margin-bottom: 1rem; }
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 0.375rem;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(99,102,241,0.25);
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+        .form-control:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+        }
+        .form-control::placeholder { color: #475569; }
+
+        .btn-login {
+            width: 100%;
+            padding: 0.7rem;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: opacity 0.2s, transform 0.1s;
+            letter-spacing: 0.04em;
+        }
+        .btn-login:hover { opacity: 0.92; transform: translateY(-1px); }
+        .btn-login:active { transform: translateY(0); }
+
+        .error-msg {
+            background: rgba(239,68,68,0.12);
+            border: 1px solid rgba(239,68,68,0.3);
+            border-radius: 8px;
+            padding: 0.6rem 0.875rem;
+            font-size: 0.8rem;
+            color: #fca5a5;
+            margin-bottom: 1rem;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 1.25rem 0;
+            color: #334155;
+            font-size: 0.75rem;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(99,102,241,0.15);
+        }
+
+        .btn-windows-retry {
+            width: 100%;
+            padding: 0.55rem;
+            background: transparent;
+            color: #94a3b8;
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .btn-windows-retry:hover { border-color: #6366f1; color: #a5b4fc; }
+
+        .footer-text {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #334155;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <!-- ロゴ -->
+        <div class="logo-section">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 2a8 8 0 110 16A8 8 0 0112 4zm0 2a6 6 0 100 12A6 6 0 0012 6zm0 2a4 4 0 110 8A4 4 0 0112 8zm-1 4a1 1 0 102 0 1 1 0 00-2 0z"/>
+                    <path d="M12 1v3M12 20v3M3.22 4.22l2.12 2.12M18.66 18.66l2.12 2.12M1 12h3M20 12h3M3.22 19.78l2.12-2.12M18.66 5.34l2.12-2.12"/>
+                </svg>
+            </div>
+            <div class="app-title">AutoParts PM</div>
+            <div class="app-subtitle">Project Management System</div>
+        </div>
+
+        <!-- Windows 認証確認中 -->
+        <div id="windows-auth-section">
+            <div class="spinner"></div>
+            <p class="auth-msg">Windows 認証を確認中...</p>
+        </div>
+
+        <!-- ログインフォーム -->
+        <div id="login-form-section">
+            @if (!ModelState.IsValid)
+            {
+                <div class="error-msg">
+                    @foreach (var error in ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>@error.ErrorMessage</div>
+                    }
+                </div>
+            }
+
+            <p class="section-label">アカウント情報でログイン</p>
+
+            <form method="post" asp-antiforgery="true">
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div class="form-group">
+                    <label class="form-label" asp-for="Input.UserName">ユーザー名</label>
+                    <input class="form-control" asp-for="Input.UserName"
+                           autocomplete="username" placeholder="domain\username または username" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label" asp-for="Input.Password">パスワード</label>
+                    <input class="form-control" type="password" asp-for="Input.Password"
+                           autocomplete="current-password" placeholder="••••••••" />
+                </div>
+                <button type="submit" class="btn-login">ログイン</button>
+            </form>
+
+            <div class="divider">または</div>
+            <button class="btn-windows-retry" onclick="tryWindowsAuth()">
+                Windows 認証で再試行
+            </button>
+        </div>
+
+        <p class="footer-text">© 2026 AutoParts PM &mdash; Powered by ASP.NET Core 9</p>
+    </div>
+
+    <!-- Windows サインイン URL (パスベース対応) -->
+    <div id="windows-signin-url" data-url="@windowsSigninUrl" style="display:none"></div>
+    <div id="return-url" data-url="@Model.ReturnUrl" style="display:none"></div>
+
+    <script>
+        (function () {
+            // ページロード時に自動で Windows 認証を試みる
+            tryWindowsAuth();
+
+            async function tryWindowsAuth() {
+                const signinBase = document.getElementById('windows-signin-url').dataset.url;
+                const returnUrl = document.getElementById('return-url').dataset.url || '/';
+                const url = signinBase + '?ajax=true&returnUrl=' + encodeURIComponent(returnUrl);
+
+                try {
+                    const res = await fetch(url, { credentials: 'include' });
+                    if (res.ok) {
+                        const dest = (await res.text()).trim();
+                        window.location.href = dest || returnUrl;
+                        return;
+                    }
+                } catch (_) { /* ignore */ }
+
+                // Windows 認証失敗 → フォーム表示
+                showLoginForm();
+            }
+
+            window.tryWindowsAuth = tryWindowsAuth;
+
+            function showLoginForm() {
+                document.getElementById('windows-auth-section').style.display = 'none';
+                const f = document.getElementById('login-form-section');
+                f.style.display = 'block';
+            }
+        })();
+    </script>
+</body>
+</html>

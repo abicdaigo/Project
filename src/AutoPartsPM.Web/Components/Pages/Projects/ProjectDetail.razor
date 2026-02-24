@@ -1,6 +1,18 @@
 @page "/projects/{Id:int}"
+@attribute [Authorize]
 @inject IMediator Mediator
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+@using AutoPartsPM.Application.Features.Projects.Commands.UpdateProject
+@using AutoPartsPM.Application.Features.Projects.Commands.UpdateProjectPhase
+@using AutoPartsPM.Application.Features.ProjectMembers.Commands.AddProjectMember
+@using AutoPartsPM.Application.Features.ProjectMembers.Commands.RemoveProjectMember
+@using AutoPartsPM.Application.Features.ProjectMembers.Queries.GetProjectMembers
+@using AutoPartsPM.Application.Features.Deliverables.Commands.CreateDeliverable
+@using AutoPartsPM.Application.Features.Deliverables.Commands.UpdateDeliverable
+@using AutoPartsPM.Application.Features.Deliverables.Commands.DeleteDeliverable
+@using AutoPartsPM.Application.Features.Deliverables.Queries.GetDeliverableList
 
 <PageTitle>@(_project?.ProjectName ?? "プロジェクト詳細") - AutoParts PM</PageTitle>
 
@@ -28,10 +40,18 @@ else
                         @_project.ProjectCode | @_project.CustomerName | 品番: @_project.PartNumber
                     </MudText>
                 </div>
-                <div>
+                <div class="d-flex align-center gap-2">
                     <MudChip T="string" Color="GetStatusColor(_project.Status)" Size="Size.Large">
                         @GetStatusName(_project.Status)
                     </MudChip>
+                    @if (!_isEditing)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                            StartIcon="@Icons.Material.Filled.Edit"
+                            OnClick="StartEditing">
+                            編集
+                        </MudButton>
+                    }
                 </div>
             </div>
         </MudItem>
@@ -82,37 +102,225 @@ else
 
     <!-- タブ -->
     <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+
+        <!-- 基本情報 -->
+        <MudTabPanel Text="基本情報" Icon="@Icons.Material.Filled.Info">
+            @if (_isEditing)
+            {
+                <MudForm @ref="_editForm" Model="@_editCommand">
+                    <MudGrid>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_editCommand.ProjectCode" Label="プロジェクトコード *"
+                                Required="true" RequiredError="プロジェクトコードは必須です"
+                                MaxLength="50" />
+                        </MudItem>
+                        <MudItem xs="12" sm="8">
+                            <MudTextField @bind-Value="_editCommand.ProjectName" Label="プロジェクト名 *"
+                                Required="true" RequiredError="プロジェクト名は必須です"
+                                MaxLength="200" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_editCommand.PartNumber" Label="品番 *"
+                                Required="true" RequiredError="品番は必須です"
+                                MaxLength="100" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_editCommand.ModelCode" Label="車型コード"
+                                MaxLength="50" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudDatePicker Date="@_editSopDate"
+                                DateChanged="@(d => { _editSopDate = d; _editCommand.SOPDate = d; })"
+                                Label="SOP予定日"
+                                DateFormat="yyyy/MM/dd" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_editCommand.ProjectManagerName" Label="プロジェクトマネージャー"
+                                MaxLength="100" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_editCommand.Status" Label="ステータス">
+                                @foreach (ProjectStatus s in Enum.GetValues<ProjectStatus>())
+                                {
+                                    <MudSelectItem Value="@s">@GetStatusName(s)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editCommand.Description" Label="説明"
+                                Lines="3" MaxLength="1000" />
+                        </MudItem>
+                        <MudItem xs="12" Class="d-flex gap-2 mt-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                OnClick="SaveProjectChanges" Disabled="@_saving"
+                                StartIcon="@Icons.Material.Filled.Save">
+                                @if (_saving)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                }
+                                保存
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                                OnClick="CancelEditing"
+                                StartIcon="@Icons.Material.Filled.Cancel">
+                                キャンセル
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+            }
+            else
+            {
+                <MudGrid>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">プロジェクトコード</MudText>
+                            <MudText Typo="Typo.body1">@_project.ProjectCode</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="8">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">プロジェクト名</MudText>
+                            <MudText Typo="Typo.body1">@_project.ProjectName</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">顧客</MudText>
+                            <MudText Typo="Typo.body1">@_project.CustomerName</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">品番</MudText>
+                            <MudText Typo="Typo.body1">@_project.PartNumber</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">車型コード</MudText>
+                            <MudText Typo="Typo.body1">@(_project.ModelCode ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">SOP予定日</MudText>
+                            <MudText Typo="Typo.body1">@(_project.SOPDate?.ToString("yyyy/MM/dd") ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">プロジェクトマネージャー</MudText>
+                            <MudText Typo="Typo.body1">@(_project.ProjectManagerName ?? "-")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">登録日時</MudText>
+                            <MudText Typo="Typo.body1">@_project.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">最終更新日時</MudText>
+                            <MudText Typo="Typo.body1">@_project.UpdatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    @if (!string.IsNullOrWhiteSpace(_project.Description))
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Class="pa-3" Elevation="0" Style="border: 1px solid var(--mud-palette-lines-default);">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">説明</MudText>
+                                <MudText Typo="Typo.body1">@_project.Description</MudText>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudTabPanel>
+
         <!-- APQPフェーズ -->
         <MudTabPanel Text="APQPフェーズ" Icon="@Icons.Material.Filled.Timeline">
-            <MudTimeline TimelineOrientation="TimelineOrientation.Horizontal" TimelinePosition="TimelinePosition.Top">
-                @foreach (var phase in _project.Phases)
-                {
-                    <MudTimelineItem Color="GetPhaseStatusColor(phase.Status)" Size="Size.Medium">
-                        <ItemContent>
-                            <MudCard Elevation="1" Class="pa-2" Style="min-width: 180px;">
-                                <MudText Typo="Typo.subtitle2" Align="Align.Center">@GetPhaseName(phase.Phase)</MudText>
-                                <MudProgressLinear Color="GetPhaseStatusColor(phase.Status)"
-                                    Value="@((double)phase.CompletionRate)" Class="my-2" />
-                                <MudText Typo="Typo.caption" Align="Align.Center">@phase.CompletionRate.ToString("F0")%</MudText>
-                                <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
-                                    成果物: @phase.CompletedDeliverableCount / @phase.DeliverableCount
-                                </MudText>
-                                @if (phase.PlannedEndDate.HasValue)
-                                {
-                                    <MudText Typo="Typo.caption" Align="Align.Center">
-                                        期限: @phase.PlannedEndDate.Value.ToString("yyyy/MM/dd")
-                                    </MudText>
-                                }
-                            </MudCard>
-                        </ItemContent>
-                    </MudTimelineItem>
-                }
-            </MudTimeline>
+            <MudTable Items="@_project.Phases" T="PhaseDto" Hover="true" Dense="true">
+                <HeaderContent>
+                    <MudTh>フェーズ</MudTh>
+                    <MudTh>ステータス</MudTh>
+                    <MudTh>進捗率</MudTh>
+                    <MudTh>実績開始日</MudTh>
+                    <MudTh>実績終了日</MudTh>
+                    <MudTh>備考</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    @if (_editingPhaseId == context.Id)
+                    {
+                        <MudTd>@GetPhaseName(context.Phase)</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="GetPhaseStatusColor(context.Status)">
+                                @GetPhaseStatusName(context.Status)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="min-width: 140px;">
+                            <MudNumericField @bind-Value="_phaseEditCommand.Progress"
+                                Min="0" Max="100" Step="5"
+                                Adornment="Adornment.End" AdornmentText="%"
+                                Dense="true" Margin="Margin.Dense" />
+                        </MudTd>
+                        <MudTd>
+                            <MudDatePicker Date="@_phaseEditCommand.ActualStartDate"
+                                DateChanged="@(d => _phaseEditCommand.ActualStartDate = d)"
+                                DateFormat="yyyy/MM/dd" Dense="true" />
+                        </MudTd>
+                        <MudTd>
+                            <MudDatePicker Date="@_phaseEditCommand.ActualEndDate"
+                                DateChanged="@(d => _phaseEditCommand.ActualEndDate = d)"
+                                DateFormat="yyyy/MM/dd" Dense="true" />
+                        </MudTd>
+                        <MudTd>
+                            <MudTextField @bind-Value="_phaseEditCommand.Notes"
+                                Dense="true" Margin="Margin.Dense" />
+                        </MudTd>
+                        <MudTd>
+                            <div class="d-flex gap-1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary"
+                                    Size="Size.Small" OnClick="SavePhaseChanges"
+                                    Disabled="@_savingPhase" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Secondary"
+                                    Size="Size.Small" OnClick="CancelPhaseEditing" />
+                            </div>
+                        </MudTd>
+                    }
+                    else
+                    {
+                        <MudTd>@GetPhaseName(context.Phase)</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="GetPhaseStatusColor(context.Status)">
+                                @GetPhaseStatusName(context.Status)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <div class="d-flex align-center gap-2">
+                                <MudProgressLinear Color="GetPhaseStatusColor(context.Status)"
+                                    Value="@((double)context.CompletionRate)" Style="width: 80px;" />
+                                <MudText Typo="Typo.caption">@context.CompletionRate.ToString("F0")%</MudText>
+                            </div>
+                        </MudTd>
+                        <MudTd>@context.ActualStartDate?.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd>@context.ActualEndDate?.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd></MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                Color="Color.Primary"
+                                OnClick="@(() => StartPhaseEditing(context))" />
+                        </MudTd>
+                    }
+                </RowTemplate>
+            </MudTable>
         </MudTabPanel>
 
         <!-- ゲートレビュー -->
         <MudTabPanel Text="ゲートレビュー" Icon="@Icons.Material.Filled.CheckCircle">
-            <MudTable Items="@_project.GateReviews" Hover="true" Dense="true">
+            <MudTable Items="@_project.GateReviews" T="GateReviewDto" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>ゲート</MudTh>
                     <MudTh>レビュー日</MudTh>
@@ -136,7 +344,7 @@ else
 
         <!-- PPAP -->
         <MudTabPanel Text="PPAP" Icon="@Icons.Material.Filled.Description">
-            <MudTable Items="@_project.PPAPDocuments" Hover="true" Dense="true">
+            <MudTable Items="@_project.PPAPDocuments" T="PPAPDocumentDto" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>No.</MudTh>
                     <MudTh>書類名</MudTh>
@@ -167,7 +375,7 @@ else
 
         <!-- マイルストーン -->
         <MudTabPanel Text="マイルストーン" Icon="@Icons.Material.Filled.Flag">
-            <MudTable Items="@_project.Milestones" Hover="true" Dense="true">
+            <MudTable Items="@_project.Milestones" T="MilestoneDto" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>名称</MudTh>
                     <MudTh>フェーズ</MudTh>
@@ -191,7 +399,7 @@ else
 
         <!-- 課題 -->
         <MudTabPanel Text=@($"課題 ({_project.OpenIssueCount})") Icon="@Icons.Material.Filled.BugReport">
-            <MudTable Items="@_project.Issues" Hover="true" Dense="true">
+            <MudTable Items="@_project.Issues" T="IssueDto" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>タイトル</MudTh>
                     <MudTh>優先度</MudTh>
@@ -221,7 +429,7 @@ else
 
         <!-- 設備 -->
         <MudTabPanel Text="設備" Icon="@Icons.Material.Filled.PrecisionManufacturing">
-            <MudTable Items="@_project.Equipment" Hover="true" Dense="true">
+            <MudTable Items="@_project.Equipment" T="EquipmentDto" Hover="true" Dense="true">
                 <HeaderContent>
                     <MudTh>コード</MudTh>
                     <MudTh>設備名</MudTh>
@@ -242,6 +450,177 @@ else
                 </RowTemplate>
             </MudTable>
         </MudTabPanel>
+
+        <!-- メンバー -->
+        <MudTabPanel Text="メンバー" Icon="@Icons.Material.Filled.Group">
+            <!-- 追加フォーム -->
+            <MudExpansionPanels Class="mb-4">
+                <MudExpansionPanel Text="メンバーを追加" Icon="@Icons.Material.Filled.PersonAdd">
+                    <MudForm @ref="_memberForm">
+                        <MudGrid>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_addMemberCommand.UserName" Label="名前 *"
+                                    Required="true" RequiredError="名前は必須です"
+                                    MaxLength="100" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_addMemberCommand.Role" Label="役割 *"
+                                    Required="true" RequiredError="役割は必須です"
+                                    MaxLength="100"
+                                    HelperText="例: 設計担当, 品質保証, 製造担当" />
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudTextField @bind-Value="_addMemberCommand.Department" Label="部署"
+                                    MaxLength="100" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                    StartIcon="@Icons.Material.Filled.Add"
+                                    OnClick="AddMember" Disabled="@_addingMember">
+                                    @if (_addingMember)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    追加
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                    </MudForm>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+
+            <!-- メンバー一覧 -->
+            @if (_membersLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (_members.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">メンバーが登録されていません</MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@_members" T="ProjectMemberDto" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>名前</MudTh>
+                        <MudTh>役割</MudTh>
+                        <MudTh>部署</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.UserName</MudTd>
+                        <MudTd>@context.Role</MudTd>
+                        <MudTd>@(context.Department ?? "-")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                Color="Color.Error"
+                                OnClick="@(() => RemoveMember(context.Id))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        <!-- 成果物 -->
+        <MudTabPanel Text="成果物" Icon="@Icons.Material.Filled.TaskAlt">
+            <!-- フェーズ選択 -->
+            <MudSelect T="int" Value="_selectedPhaseId" ValueChanged="OnPhaseSelected"
+                Label="フェーズを選択" Class="mb-4" Style="max-width: 300px;">
+                <MudSelectItem Value="0">すべてのフェーズ</MudSelectItem>
+                @foreach (var phase in _project.Phases)
+                {
+                    <MudSelectItem Value="@phase.Id">@GetPhaseName(phase.Phase)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <!-- 追加フォーム -->
+            @if (_selectedPhaseId > 0)
+            {
+                <MudExpansionPanels Class="mb-4">
+                    <MudExpansionPanel Text="成果物を追加" Icon="@Icons.Material.Filled.Add">
+                        <MudForm @ref="_deliverableForm">
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_createDeliverableCommand.Name" Label="成果物名 *"
+                                        Required="true" RequiredError="成果物名は必須です"
+                                        MaxLength="200" />
+                                </MudItem>
+                                <MudItem xs="12" sm="3">
+                                    <MudDatePicker Date="@_createDeliverableCommand.DueDate"
+                                        DateChanged="@(d => _createDeliverableCommand.DueDate = d)"
+                                        Label="期限" DateFormat="yyyy/MM/dd" />
+                                </MudItem>
+                                <MudItem xs="12" sm="3">
+                                    <MudCheckBox @bind-Value="_createDeliverableCommand.Required"
+                                        Label="必須" Color="Color.Primary" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField @bind-Value="_createDeliverableCommand.Description"
+                                        Label="説明" Lines="2" MaxLength="500" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                        StartIcon="@Icons.Material.Filled.Add"
+                                        OnClick="CreateDeliverable" Disabled="@_creatingDeliverable">
+                                        @if (_creatingDeliverable)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                        }
+                                        追加
+                                    </MudButton>
+                                </MudItem>
+                            </MudGrid>
+                        </MudForm>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+
+            <!-- 成果物一覧 -->
+            @if (_deliverablesLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+            else if (_deliverables.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    @(_selectedPhaseId == 0 ? "成果物が登録されていません" : "このフェーズに成果物がありません。上のフォームから追加してください。")
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@_deliverables" T="DeliverableListDto" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>成果物名</MudTh>
+                        <MudTh>必須</MudTh>
+                        <MudTh>期限</MudTh>
+                        <MudTh>ステータス</MudTh>
+                        <MudTh>完了日</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>
+                            @if (context.Required)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                            }
+                        </MudTd>
+                        <MudTd>@context.DueDate?.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="GetDeliverableStatusColor(context.Status)">
+                                @GetDeliverableStatusName(context.Status)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>@context.CompletedDate?.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                Color="Color.Error"
+                                OnClick="@(() => DeleteDeliverable(context.Id))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
     </MudTabs>
 }
 
@@ -251,13 +630,257 @@ else
     private ProjectDetailDto? _project;
     private bool _loading = true;
 
+    // --- 基本情報編集 ---
+    private bool _isEditing = false;
+    private bool _saving = false;
+    private MudForm? _editForm;
+    private UpdateProjectCommand _editCommand = new();
+    private DateTime? _editSopDate;
+
+    // --- APQPフェーズ編集 ---
+    private int _editingPhaseId = 0;
+    private bool _savingPhase = false;
+    private UpdateProjectPhaseCommand _phaseEditCommand = new();
+
+    // --- メンバー管理 ---
+    private List<ProjectMemberDto> _members = new();
+    private bool _membersLoading = false;
+    private bool _addingMember = false;
+    private MudForm? _memberForm;
+    private AddProjectMemberCommand _addMemberCommand = new();
+
+    // --- 成果物管理 ---
+    private List<DeliverableListDto> _deliverables = new();
+    private bool _deliverablesLoading = false;
+    private bool _creatingDeliverable = false;
+    private int _selectedPhaseId = 0;
+    private MudForm? _deliverableForm;
+    private CreateDeliverableCommand _createDeliverableCommand = new();
+
     protected override async Task OnInitializedAsync()
     {
+        await LoadProjectAsync();
+        await LoadMembersAsync();
+    }
+
+    private async Task LoadProjectAsync()
+    {
+        _loading = true;
         _project = await Mediator.Send(new GetProjectDetailQuery(Id));
         _loading = false;
     }
 
-    // ヘルパーメソッド
+    private async Task LoadMembersAsync()
+    {
+        _membersLoading = true;
+        _members = await Mediator.Send(new GetProjectMembersQuery(Id));
+        _membersLoading = false;
+    }
+
+    private async Task OnPhaseSelected(int phaseId)
+    {
+        _selectedPhaseId = phaseId;
+        if (phaseId > 0)
+        {
+            _createDeliverableCommand = new CreateDeliverableCommand { ProjectPhaseId = phaseId };
+            _deliverablesLoading = true;
+            _deliverables = await Mediator.Send(new GetDeliverableListQuery { ProjectPhaseId = phaseId });
+            _deliverablesLoading = false;
+        }
+        else
+        {
+            _deliverables = new();
+        }
+    }
+
+    // ---- 基本情報 編集 ----
+    private void StartEditing()
+    {
+        if (_project is null) return;
+        _editCommand = new UpdateProjectCommand
+        {
+            Id = _project.Id,
+            ProjectCode = _project.ProjectCode,
+            ProjectName = _project.ProjectName,
+            PartNumber = _project.PartNumber,
+            ModelCode = _project.ModelCode,
+            SOPDate = _project.SOPDate,
+            Description = _project.Description,
+            ProjectManagerName = _project.ProjectManagerName,
+            Status = _project.Status
+        };
+        _editSopDate = _project.SOPDate;
+        _isEditing = true;
+    }
+
+    private void CancelEditing()
+    {
+        _isEditing = false;
+        _editCommand = new UpdateProjectCommand();
+    }
+
+    private async Task SaveProjectChanges()
+    {
+        if (_editForm is not null)
+            await _editForm.Validate();
+        if (_editForm?.IsValid != true) return;
+
+        _saving = true;
+        try
+        {
+            var result = await Mediator.Send(_editCommand);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("プロジェクト情報を更新しました", Severity.Success);
+                _isEditing = false;
+                await LoadProjectAsync();
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // ---- APQPフェーズ編集 ----
+    private void StartPhaseEditing(PhaseDto phase)
+    {
+        _editingPhaseId = phase.Id;
+        _phaseEditCommand = new UpdateProjectPhaseCommand
+        {
+            Id = phase.Id,
+            Progress = phase.CompletionRate,
+            ActualStartDate = phase.ActualStartDate,
+            ActualEndDate = phase.ActualEndDate
+        };
+    }
+
+    private void CancelPhaseEditing()
+    {
+        _editingPhaseId = 0;
+        _phaseEditCommand = new UpdateProjectPhaseCommand();
+    }
+
+    private async Task SavePhaseChanges()
+    {
+        _savingPhase = true;
+        try
+        {
+            var result = await Mediator.Send(_phaseEditCommand);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("フェーズ情報を更新しました", Severity.Success);
+                _editingPhaseId = 0;
+                await LoadProjectAsync();
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingPhase = false;
+        }
+    }
+
+    // ---- メンバー管理 ----
+    private async Task AddMember()
+    {
+        if (_memberForm is not null)
+            await _memberForm.Validate();
+        if (_memberForm?.IsValid != true) return;
+
+        _addMemberCommand.ProjectId = Id;
+        _addingMember = true;
+        try
+        {
+            var result = await Mediator.Send(_addMemberCommand);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("メンバーを追加しました", Severity.Success);
+                _addMemberCommand = new AddProjectMemberCommand();
+                await LoadMembersAsync();
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _addingMember = false;
+        }
+    }
+
+    private async Task RemoveMember(int memberId)
+    {
+        var result = await Mediator.Send(new RemoveProjectMemberCommand(memberId));
+        if (result.Succeeded)
+        {
+            Snackbar.Add("メンバーを削除しました", Severity.Success);
+            await LoadMembersAsync();
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+                Snackbar.Add(error, Severity.Error);
+        }
+    }
+
+    // ---- 成果物管理 ----
+    private async Task CreateDeliverable()
+    {
+        if (_deliverableForm is not null)
+            await _deliverableForm.Validate();
+        if (_deliverableForm?.IsValid != true) return;
+
+        _creatingDeliverable = true;
+        try
+        {
+            var result = await Mediator.Send(_createDeliverableCommand);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("成果物を追加しました", Severity.Success);
+                _createDeliverableCommand = new CreateDeliverableCommand { ProjectPhaseId = _selectedPhaseId };
+                _deliverables = await Mediator.Send(new GetDeliverableListQuery { ProjectPhaseId = _selectedPhaseId });
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                    Snackbar.Add(error, Severity.Error);
+            }
+        }
+        finally
+        {
+            _creatingDeliverable = false;
+        }
+    }
+
+    private async Task DeleteDeliverable(int deliverableId)
+    {
+        var result = await Mediator.Send(new DeleteDeliverableCommand(deliverableId));
+        if (result.Succeeded)
+        {
+            Snackbar.Add("成果物を削除しました", Severity.Success);
+            if (_selectedPhaseId > 0)
+                _deliverables = await Mediator.Send(new GetDeliverableListQuery { ProjectPhaseId = _selectedPhaseId });
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+                Snackbar.Add(error, Severity.Error);
+        }
+    }
+
+    // ---- ヘルパーメソッド ----
     private static string GetPhaseName(APQPPhase phase) => phase switch
     {
         APQPPhase.Planning => "計画・定義",
@@ -286,6 +909,16 @@ else
         PhaseStatus.Completed => Color.Success,
         PhaseStatus.Delayed => Color.Error,
         _ => Color.Default
+    };
+
+    private static string GetPhaseStatusName(PhaseStatus status) => status switch
+    {
+        PhaseStatus.NotStarted => "未着手",
+        PhaseStatus.InProgress => "進行中",
+        PhaseStatus.UnderReview => "レビュー中",
+        PhaseStatus.Completed => "完了",
+        PhaseStatus.Delayed => "遅延",
+        _ => status.ToString()
     };
 
     private static string GetStatusName(ProjectStatus s) => s switch
@@ -401,6 +1034,24 @@ else
         EquipmentStatus.Planning => Color.Default, EquipmentStatus.Ordered => Color.Info,
         EquipmentStatus.Manufacturing => Color.Primary, EquipmentStatus.Delivered => Color.Warning,
         EquipmentStatus.Installed => Color.Secondary, EquipmentStatus.Operational => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string GetDeliverableStatusName(DeliverableStatus s) => s switch
+    {
+        DeliverableStatus.NotStarted => "未着手",
+        DeliverableStatus.InProgress => "作成中",
+        DeliverableStatus.UnderReview => "レビュー中",
+        DeliverableStatus.Completed => "完了",
+        _ => s.ToString()
+    };
+
+    private static Color GetDeliverableStatusColor(DeliverableStatus s) => s switch
+    {
+        DeliverableStatus.NotStarted => Color.Default,
+        DeliverableStatus.InProgress => Color.Primary,
+        DeliverableStatus.UnderReview => Color.Warning,
+        DeliverableStatus.Completed => Color.Success,
         _ => Color.Default
     };
 }

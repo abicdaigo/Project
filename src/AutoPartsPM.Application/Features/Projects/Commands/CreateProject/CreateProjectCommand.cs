@@ -5,13 +5,13 @@ namespace AutoPartsPM.Application.Features.Projects.Commands.CreateProject;
 
 public record CreateProjectCommand : IRequest<Result<int>>
 {
-    public string ProjectCode { get; init; } = string.Empty;
-    public string ProjectName { get; init; } = string.Empty;
-    public int CustomerId { get; init; }
-    public string PartNumber { get; init; } = string.Empty;
-    public string? ModelCode { get; init; }
-    public DateTime? SOPDate { get; init; }
-    public string? Description { get; init; }
-    public string ProjectManagerId { get; init; } = string.Empty;
-    public string? ProjectManagerName { get; init; }
+    public string ProjectCode { get; set; } = string.Empty;
+    public string ProjectName { get; set; } = string.Empty;
+    public int CustomerId { get; set; }
+    public string PartNumber { get; set; } = string.Empty;
+    public string? ModelCode { get; set; }
+    public DateTime? SOPDate { get; set; }
+    public string? Description { get; set; }
+    public string ProjectManagerId { get; set; } = string.Empty;
+    public string? ProjectManagerName { get; set; }
 }

@@ -15,6 +15,7 @@ public interface IApplicationDbContext
     DbSet<Deliverable> Deliverables { get; }
     DbSet<Equipment> Equipment { get; }
     DbSet<ProjectMember> ProjectMembers { get; }
+    DbSet<AuditLog> AuditLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

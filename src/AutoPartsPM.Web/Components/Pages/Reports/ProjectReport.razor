@@ -1,0 +1,95 @@
+@page "/reports"
+@attribute [Authorize]
+@inject IMediator Mediator
+@inject IJSRuntime JS
+
+@using AutoPartsPM.Application.Common.Interfaces
+
+<PageTitle>レポート - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">レポート出力</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">プロジェクトレポート（Excel）</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        プロジェクトの基本情報・APQPフェーズ・マイルストーン・課題・設備をExcelファイルで出力します。
+                    </MudText>
+                    <MudSelect @bind-Value="_selectedProjectId" Label="プロジェクトを選択"
+                        Class="mb-4">
+                        <MudSelectItem Value="0">-- プロジェクトを選択してください --</MudSelectItem>
+                        @foreach (var project in _projects)
+                        {
+                            <MudSelectItem Value="@project.Id">
+                                @project.ProjectCode - @project.ProjectName
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success"
+                        StartIcon="@Icons.Material.Filled.Download"
+                        OnClick="DownloadReport"
+                        Disabled="@(_selectedProjectId == 0 || _downloading)">
+                        @if (_downloading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Excelダウンロード
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private List<ProjectListDto> _projects = new();
+    private int _selectedProjectId = 0;
+    private bool _loading = true;
+    private bool _downloading = false;
+
+    [Inject] private IReportService ReportService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _projects = await Mediator.Send(new GetProjectListQuery());
+        _loading = false;
+    }
+
+    private async Task DownloadReport()
+    {
+        if (_selectedProjectId == 0) return;
+
+        _downloading = true;
+        try
+        {
+            var bytes = await ReportService.GenerateProjectReportAsync(_selectedProjectId);
+            var selectedProject = _projects.FirstOrDefault(p => p.Id == _selectedProjectId);
+            var fileName = $"ProjectReport_{selectedProject?.ProjectCode ?? _selectedProjectId.ToString()}_{DateTime.Now:yyyyMMdd}.xlsx";
+
+            var base64 = Convert.ToBase64String(bytes);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", base64, fileName,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"レポート生成に失敗しました: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _downloading = false;
+        }
+    }
+}

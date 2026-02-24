@@ -1,0 +1,172 @@
+@page "/admin/audit"
+@attribute [Authorize(Roles = "PM_Admins")]
+@inject IMediator Mediator
+
+@using AutoPartsPM.Application.Features.AuditLogs.Queries.GetAuditLogs
+
+<PageTitle>監査ログ - AutoParts PM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">監査ログ</MudText>
+
+<!-- フィルター -->
+<MudCard Elevation="1" Class="mb-4">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4" md="3">
+                <MudSelect @bind-Value="_filterEntityName" Label="エンティティ" Clearable="true">
+                    <MudSelectItem Value="@((string?)null)">すべて</MudSelectItem>
+                    <MudSelectItem Value="@("Project")">プロジェクト</MudSelectItem>
+                    <MudSelectItem Value="@("ProjectPhase")">APQPフェーズ</MudSelectItem>
+                    <MudSelectItem Value="@("ProjectMember")">メンバー</MudSelectItem>
+                    <MudSelectItem Value="@("Deliverable")">成果物</MudSelectItem>
+                    <MudSelectItem Value="@("Issue")">課題</MudSelectItem>
+                    <MudSelectItem Value="@("Equipment")">設備</MudSelectItem>
+                    <MudSelectItem Value="@("Customer")">顧客</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4" md="3">
+                <MudSelect @bind-Value="_filterAction" Label="操作" Clearable="true">
+                    <MudSelectItem Value="@((string?)null)">すべて</MudSelectItem>
+                    <MudSelectItem Value="@("Created")">作成</MudSelectItem>
+                    <MudSelectItem Value="@("Updated")">更新</MudSelectItem>
+                    <MudSelectItem Value="@("Deleted")">削除</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4" md="3">
+                <MudDatePicker Date="@_fromDate"
+                    DateChanged="@(d => _fromDate = d)"
+                    Label="開始日" DateFormat="yyyy/MM/dd" />
+            </MudItem>
+            <MudItem xs="12" sm="4" md="3">
+                <MudDatePicker Date="@_toDate"
+                    DateChanged="@(d => _toDate = d)"
+                    Label="終了日" DateFormat="yyyy/MM/dd" />
+            </MudItem>
+            <MudItem xs="12" Class="d-flex gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                    StartIcon="@Icons.Material.Filled.Search"
+                    OnClick="Search" Disabled="@_searching">
+                    @if (_searching)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    検索
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                    StartIcon="@Icons.Material.Filled.Clear"
+                    OnClick="ClearFilter">
+                    クリア
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<!-- ログ一覧 -->
+@if (_searching)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_logs.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">条件に一致する監査ログがありません</MudAlert>
+}
+else
+{
+    <MudTable Items="@_logs" T="AuditLogDto" Hover="true" Dense="true"
+        Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>日時</MudTh>
+            <MudTh>エンティティ</MudTh>
+            <MudTh>ID</MudTh>
+            <MudTh>操作</MudTh>
+            <MudTh>ユーザー</MudTh>
+            <MudTh>変更内容</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Timestamp.ToLocalTime().ToString("yyyy/MM/dd HH:mm:ss")</MudTd>
+            <MudTd>@context.EntityName</MudTd>
+            <MudTd>@context.EntityId</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="GetActionColor(context.Action)">
+                    @GetActionName(context.Action)
+                </MudChip>
+            </MudTd>
+            <MudTd>@(context.UserName ?? "-")</MudTd>
+            <MudTd>
+                @if (!string.IsNullOrEmpty(context.Changes))
+                {
+                    <MudTooltip Text="@context.Changes">
+                        <MudText Typo="Typo.caption" Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                            @context.Changes
+                        </MudText>
+                    </MudTooltip>
+                }
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[] { 25, 50, 100 }"
+                RowsPerPageString="表示件数:" InfoFormat="{first_item}-{last_item} / {all_items}" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private List<AuditLogDto> _logs = new();
+    private bool _searching = false;
+    private string? _filterEntityName;
+    private string? _filterAction;
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Search();
+    }
+
+    private async Task Search()
+    {
+        _searching = true;
+        try
+        {
+            var query = new GetAuditLogsQuery
+            {
+                EntityName = _filterEntityName,
+                Action = _filterAction,
+                FromDate = _fromDate,
+                ToDate = _toDate,
+                PageSize = 100
+            };
+            _logs = await Mediator.Send(query);
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private void ClearFilter()
+    {
+        _filterEntityName = null;
+        _filterAction = null;
+        _fromDate = null;
+        _toDate = null;
+        _logs = new();
+    }
+
+    private static string GetActionName(string action) => action switch
+    {
+        "Created" => "作成",
+        "Updated" => "更新",
+        "Deleted" => "削除",
+        _ => action
+    };
+
+    private static Color GetActionColor(string action) => action switch
+    {
+        "Created" => Color.Success,
+        "Updated" => Color.Info,
+        "Deleted" => Color.Error,
+        _ => Color.Default
+    };
+}

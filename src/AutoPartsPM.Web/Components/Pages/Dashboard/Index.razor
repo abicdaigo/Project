@@ -1,6 +1,8 @@
 @page "/"
 @inject IMediator Mediator
 
+@using AutoPartsPM.Application.Features.Dashboard.Queries.GetDashboardData
+
 <PageTitle>ダッシュボード - AutoParts PM</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">ダッシュボード</MudText>
@@ -21,7 +23,7 @@ else
                             Class="mr-3" />
                         <div>
                             <MudText Typo="Typo.subtitle2" Color="Color.Secondary">全プロジェクト</MudText>
-                            <MudText Typo="Typo.h4">@_projects.Count</MudText>
+                            <MudText Typo="Typo.h4">@_data.TotalProjects</MudText>
                         </div>
                     </div>
                 </MudCardContent>
@@ -36,22 +38,7 @@ else
                             Class="mr-3" />
                         <div>
                             <MudText Typo="Typo.subtitle2" Color="Color.Secondary">進行中</MudText>
-                            <MudText Typo="Typo.h4">@_activeCount</MudText>
-                        </div>
-                    </div>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="2">
-                <MudCardContent>
-                    <div class="d-flex align-center">
-                        <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Large"
-                            Class="mr-3" />
-                        <div>
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">保留中</MudText>
-                            <MudText Typo="Typo.h4">@_onHoldCount</MudText>
+                            <MudText Typo="Typo.h4">@_data.ActiveProjects</MudText>
                         </div>
                     </div>
                 </MudCardContent>
@@ -66,7 +53,26 @@ else
                             Class="mr-3" />
                         <div>
                             <MudText Typo="Typo.subtitle2" Color="Color.Secondary">完了</MudText>
-                            <MudText Typo="Typo.h4">@_completedCount</MudText>
+                            <MudText Typo="Typo.h4">@_data.CompletedProjects</MudText>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning"
+                            Color="@(_data.OverdueIssues > 0 ? Color.Error : Color.Default)"
+                            Size="Size.Large" Class="mr-3" />
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">期限超過課題</MudText>
+                            <MudText Typo="Typo.h4"
+                                Color="@(_data.OverdueIssues > 0 ? Color.Error : Color.Default)">
+                                @_data.OverdueIssues
+                            </MudText>
                         </div>
                     </div>
                 </MudCardContent>
@@ -74,7 +80,7 @@ else
         </MudItem>
     </MudGrid>
 
-    <!-- プロジェクト一覧（最新5件） -->
+    <!-- プロジェクト一覧 + APQPフェーズ別 -->
     <MudGrid Class="mt-4">
         <MudItem xs="12" md="8">
             <MudCard Elevation="2">
@@ -84,6 +90,10 @@ else
                     </CardHeaderContent>
                     <CardHeaderActions>
                         <MudButton Href="/projects" Variant="Variant.Text" Color="Color.Primary">すべて表示</MudButton>
+                        <MudButton Href="/projects/create" Variant="Variant.Filled" Color="Color.Primary"
+                            StartIcon="@Icons.Material.Filled.Add" Size="Size.Small">
+                            新規作成
+                        </MudButton>
                     </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent>
@@ -128,13 +138,13 @@ else
             <MudCard Elevation="2">
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <MudText Typo="Typo.h6">APQPフェーズ別</MudText>
+                        <MudText Typo="Typo.h6">APQPフェーズ別（進行中）</MudText>
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
                     @foreach (APQPPhase phase in Enum.GetValues<APQPPhase>())
                     {
-                        var count = _projects.Count(p => p.CurrentPhase == phase && p.Status == ProjectStatus.Active);
+                        var count = _data.PhaseDistribution.TryGetValue(phase, out var c) ? c : 0;
                         <div class="d-flex justify-space-between align-center mb-3">
                             <MudText Typo="Typo.body2">@GetPhaseName(phase)</MudText>
                             <MudChip T="string" Size="Size.Small" Color="GetPhaseColor(phase)">@count 件</MudChip>
@@ -144,21 +154,115 @@ else
             </MudCard>
         </MudItem>
     </MudGrid>
+
+    <!-- 直近マイルストーン + 期限超過課題 -->
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudText Typo="Typo.h6">直近7日のマイルストーン</MudText>
+                            @if (_data.UpcomingMilestones > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                                    @_data.UpcomingMilestones 件
+                                </MudChip>
+                            }
+                        </div>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_data.UpcomingMilestoneList.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">直近7日以内のマイルストーンはありません</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="UpcomingMilestoneDto" Dense="true">
+                            @foreach (var ms in _data.UpcomingMilestoneList)
+                            {
+                                <MudListItem>
+                                    <div class="d-flex justify-space-between align-center w-100">
+                                        <div>
+                                            <MudLink Href="@($"/projects/{ms.ProjectId}")">
+                                                <MudText Typo="Typo.body2">@ms.ProjectName</MudText>
+                                            </MudLink>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@ms.Name</MudText>
+                                        </div>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                                            @ms.DueDate.ToString("MM/dd")
+                                        </MudChip>
+                                    </div>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudText Typo="Typo.h6">期限超過課題</MudText>
+                            @if (_data.OverdueIssues > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">
+                                    @_data.OverdueIssues 件
+                                </MudChip>
+                            }
+                        </div>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_data.OverdueIssueList.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">期限超過の課題はありません</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="OverdueIssueDto" Dense="true">
+                            @foreach (var issue in _data.OverdueIssueList)
+                            {
+                                <MudListItem>
+                                    <div class="d-flex justify-space-between align-center w-100">
+                                        <div>
+                                            <MudLink Href="@($"/projects/{issue.ProjectId}")">
+                                                <MudText Typo="Typo.body2">@issue.ProjectName</MudText>
+                                            </MudLink>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@issue.Title</MudText>
+                                        </div>
+                                        <MudChip T="string" Size="Size.Small" Color="GetPriorityColor(issue.Priority)">
+                                            @GetPriorityName(issue.Priority)
+                                        </MudChip>
+                                    </div>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
     private List<ProjectListDto> _projects = new();
+    private DashboardDataDto _data = new();
     private bool _loading = true;
-    private int _activeCount;
-    private int _onHoldCount;
-    private int _completedCount;
 
     protected override async Task OnInitializedAsync()
     {
-        _projects = await Mediator.Send(new GetProjectListQuery());
-        _activeCount = _projects.Count(p => p.Status == ProjectStatus.Active);
-        _onHoldCount = _projects.Count(p => p.Status == ProjectStatus.OnHold);
-        _completedCount = _projects.Count(p => p.Status == ProjectStatus.Completed);
+        var projectsTask = Mediator.Send(new GetProjectListQuery());
+        var dashboardTask = Mediator.Send(new GetDashboardDataQuery());
+        await Task.WhenAll(projectsTask, dashboardTask);
+        _projects = projectsTask.Result;
+        _data = dashboardTask.Result;
         _loading = false;
     }
 
@@ -199,6 +303,20 @@ else
         ProjectStatus.OnHold => Color.Warning,
         ProjectStatus.Completed => Color.Info,
         ProjectStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string GetPriorityName(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => "低", IssuePriority.Medium => "中",
+        IssuePriority.High => "高", IssuePriority.Critical => "最重要",
+        _ => p.ToString()
+    };
+
+    private static Color GetPriorityColor(IssuePriority p) => p switch
+    {
+        IssuePriority.Low => Color.Default, IssuePriority.Medium => Color.Info,
+        IssuePriority.High => Color.Warning, IssuePriority.Critical => Color.Error,
         _ => Color.Default
     };
 }

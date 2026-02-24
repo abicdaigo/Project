@@ -42,6 +42,13 @@
         設備管理
     </MudNavLink>
 
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">レポート</MudText>
+
+    <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Assessment">
+        レポート出力
+    </MudNavLink>
+
     <AuthorizeView Roles="PM_Admins">
         <Authorized>
             <MudDivider Class="my-2" />
@@ -58,6 +65,21 @@
 
             <MudNavLink Href="/admin/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
                 システム設定
+            </MudNavLink>
+
+            <MudNavLink Href="/admin/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
+                監査ログ
+            </MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+
+    <MudDivider Class="my-2" />
+    <AuthorizeView>
+        <Authorized>
+            <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">@context.User.Identity?.Name</MudText>
+            <MudNavLink Href="/account/logout" Match="NavLinkMatch.All"
+                Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error">
+                ログアウト
             </MudNavLink>
         </Authorized>
     </AuthorizeView>
